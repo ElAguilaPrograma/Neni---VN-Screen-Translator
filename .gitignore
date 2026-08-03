@@ -1,0 +1,34 @@
+## [Visual Studio / .NET Core / .NET 10]
+# Carpetas de compilación y salida de binarios
+[Bb]in/
+[Oo]bj/
+
+# Archivos de configuración de usuario generados localmente
+*.user
+*.userosscache
+*.sln.docstates
+
+# Carpeta de herramientas locales de .NET y manifiestos de desarrollo
+.dotnet/
+.devcontainer/
+
+## [Visual Studio Code]
+# Configuración específica del editor VS Code
+.vscode/
+!/.vscode/extensions.json
+
+## [User Secrets & Sensitive Data]
+# Secretos de la aplicación (¡Nunca los subas al repositorio!)
+secrets.json
+.env
+*.env.local
+
+## [Resharper / Rider / JetBrains]
+# Archivos de caché y configuración de IDEs de JetBrains
+.idea/
+*.sln.DotSettings.user
+
+## [Sistemas Operativos]
+# Archivos basura del sistema operativo
+Thumbs.db
+.DS_Store

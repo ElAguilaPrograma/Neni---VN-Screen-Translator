@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="RapidOcrNet" Version="3.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Models\PP-OCRv5\" />
+    </ItemGroup>
+
+</Project>
