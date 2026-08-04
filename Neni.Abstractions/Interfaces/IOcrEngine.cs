@@ -2,7 +2,7 @@ using Neni.Abstractions.Entities;
 
 namespace Neni.Abstractions.Interfaces;
 
-public interface IOcrEngine
+public interface IOcrEngine : IAsyncDisposable
 {
-    Task<OcrResult> ExtractTextAsync(Frame frame, CancellationToken cancellationToken = default);
+    Task<OcrResult> DetectAsync(Frame frame, CancellationToken cancellationToken = default);
 }

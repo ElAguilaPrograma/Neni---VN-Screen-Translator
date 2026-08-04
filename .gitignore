@@ -32,3 +32,5 @@ secrets.json
 # Archivos basura del sistema operativo
 Thumbs.db
 .DS_Store
+
+Neni.Ocr/Test/

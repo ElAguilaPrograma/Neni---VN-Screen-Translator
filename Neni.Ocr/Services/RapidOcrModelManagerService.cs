@@ -1,4 +1,4 @@
-namespace Neni.Ocr.Helpers;
+namespace Neni.Ocr.Services;
 
 public enum RapidOcrVersion
 {

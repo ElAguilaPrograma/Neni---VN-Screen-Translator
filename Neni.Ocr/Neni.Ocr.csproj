@@ -12,6 +12,11 @@
 
     <ItemGroup>
       <Folder Include="Models\PP-OCRv5\" />
+      <Folder Include="Test\Frames\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Neni.Abstractions\Neni.Abstractions.csproj" />
     </ItemGroup>
 
 </Project>

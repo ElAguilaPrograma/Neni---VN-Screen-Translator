@@ -1,0 +1,93 @@
+using System.Globalization;
+using Neni.Abstractions.Entities;
+using Neni.Abstractions.Enums;
+using Neni.Abstractions.Interfaces;
+using RapidOcrNet;
+using SkiaSharp;
+
+namespace Neni.Ocr.Services;
+
+public sealed class OcrEngine : IOcrEngine
+{
+    // TODO Instanciar el OCR al iniciar la aplicación.
+    private readonly global::RapidOcrNet.RapidOcr _engine;
+    private readonly RapidOcrOptions _options;
+    
+    // Contrustor privado que solo se llama desde CreateAsync, asi cuando existe una instacia ya esta lista para usarse.
+    private OcrEngine(global::RapidOcrNet.RapidOcr engine, RapidOcrOptions options)
+    {
+        _engine = engine;
+        _options = options;
+    }
+    
+    // Crea y caarga un motor RapidOcr. Resuleve los modelos de la versión indicada antes de devolver la instancia
+    public static async Task<OcrEngine> CreateAsync(
+        RapidOcrModelManagerService modelManager,
+        RapidOcrVersion version = RapidOcrVersion.V5,
+        RapidOcrOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        RapidOcrModelPaths paths = await modelManager.DetectAsync(version, cancellationToken);
+
+        var nativeEngine = new global::RapidOcrNet.RapidOcr();
+        
+        // InitModels es sincrono y pesado, se despacha a un thread pool para no bloquear el caller
+        await Task.Run(() => nativeEngine.InitModels(
+                detPath: paths.DetectionModelPath,
+                clsPath: paths.ClassificationModelPath,
+                recPath: paths.RecognitionModelPath,
+                keysPath: paths.DictionaryPath),
+            cancellationToken);
+
+        return new OcrEngine(nativeEngine, options ?? RapidOcrOptions.Default);
+    }
+
+    public async Task<Neni.Abstractions.Entities.OcrResult> DetectAsync(Frame frame,
+        CancellationToken cancellationToken = default)
+    {
+        using SKBitmap bitmap = ToSkBitmap(frame);
+        
+        // Rapid.Ocr es sincrono, Task.Run evita bloquear el hilo que lo llama IMPORTANTE PORQUE SI NO EL LOOP QUE LO LLAMA SE ROMPE
+        RapidOcrNet.OcrResult native = await Task.Run(
+            () => _engine.Detect(bitmap, _options),
+            cancellationToken);
+
+        return MapToAbstraction(native);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _engine.Dispose();
+        await Task.CompletedTask;
+    }
+
+    // Convertir el frame en un SKBitmap que es el formato que espera RapidOcr
+    private static SKBitmap ToSkBitmap(Frame frame)
+    {
+        var colorType = frame.Format switch
+        {
+            PixelFormat.Bgra8888 => SKColorType.Bgra8888,
+            PixelFormat.Rgba8888 => SKColorType.Rgba8888,
+            _ => throw new NotSupportedException($"Formato no soportado: {frame.Format}")
+        };
+
+        var info = new SKImageInfo(frame.Width, frame.Height, colorType, SKAlphaType.Premul);
+        var bitmap = new SKBitmap(info);
+
+        frame.PixelData.Span.CopyTo(bitmap.GetPixelSpan());
+
+        return bitmap;
+    }
+    
+    // Mapear salida del Ocr a la abstracción OcrResult
+    private static Neni.Abstractions.Entities.OcrResult MapToAbstraction(RapidOcrNet.OcrResult native)
+    {
+        var blocks = native.TextBlocks.Select(b => new OcrTextBlock(
+            Text: b.Text,
+            BoxPoints: b.BoxPoints.Select(p => new TextPoint(p.X, p.Y)).ToArray(),
+            Confidence: b.CharScores is { Length: > 0 } scores ? scores.Average() : 0f
+        )).ToList();
+
+        return new Neni.Abstractions.Entities.OcrResult(blocks);
+    }
+}
