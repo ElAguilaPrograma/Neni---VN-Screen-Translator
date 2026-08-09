@@ -7,12 +7,12 @@ namespace Neni.Tests.Ocr.Helpers;
 // asi los modelos ONNX se cargan una vez en vez de una vez por caso de test.
 public sealed class OcrEngineFixture : IAsyncLifetime
 {
-    public IOcrEngine Engine { get; private set; } = null!;
+    public IOcr Engine { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
         var modelManager = new RapidOcrModelManagerService();
-        Engine = await OcrEngine.CreateAsync(modelManager, RapidOcrVersion.V5);
+        Engine = await Neni.Ocr.Services.Ocr.CreateAsync(modelManager, RapidOcrVersion.V5);
     }
 
     public async Task DisposeAsync()

@@ -7,10 +7,10 @@ namespace Neni.Application.Services;
 // TODO Implementar la interfaz
 public class Coordinator 
 {
-    private readonly IOcrEngine _engine;
+    private readonly IOcr _engine;
     private bool _isActive = false;
 
-    public Coordinator(IOcrEngine engine)
+    public Coordinator(IOcr engine)
     {
         _engine = engine;
     }

@@ -10,7 +10,7 @@ public class OcrTest
 {
     private const string EnglishFramesDirectory = "Ocr/Frames/English/All";
 
-    private readonly IOcrEngine _engine;
+    private readonly IOcr _engine;
     private readonly ITestOutputHelper _output;
 
     public OcrTest(OcrEngineFixture fixture, ITestOutputHelper output)

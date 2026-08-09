@@ -7,21 +7,21 @@ using SkiaSharp;
 
 namespace Neni.Ocr.Services;
 
-public sealed class OcrEngine : IOcrEngine
+public sealed class Ocr : IOcr
 {
     // TODO Instanciar el OCR al iniciar la aplicación.
-    private readonly global::RapidOcrNet.RapidOcr _engine;
+    private readonly RapidOcrNet.RapidOcr _engine;
     private readonly RapidOcrOptions _options;
     
     // Contrustor privado que solo se llama desde CreateAsync, asi cuando existe una instacia ya esta lista para usarse.
-    private OcrEngine(global::RapidOcrNet.RapidOcr engine, RapidOcrOptions options)
+    private Ocr(RapidOcrNet.RapidOcr engine, RapidOcrOptions options)
     {
         _engine = engine;
         _options = options;
     }
     
-    // Crea y caarga un motor RapidOcr. Resuleve los modelos de la versión indicada antes de devolver la instancia
-    public static async Task<OcrEngine> CreateAsync(
+    // Crea y carga un motor RapidOcr. Resuelve los modelos de la versión indicada antes de devolver la instancia
+    public static async Task<Ocr> CreateAsync(
         RapidOcrModelManagerService modelManager,
         RapidOcrVersion version = RapidOcrVersion.V5,
         RapidOcrOptions? options = null,
@@ -29,7 +29,7 @@ public sealed class OcrEngine : IOcrEngine
     {
         RapidOcrModelPaths paths = await modelManager.DetectAsync(version, cancellationToken);
 
-        var nativeEngine = new global::RapidOcrNet.RapidOcr();
+        var nativeEngine = new RapidOcrNet.RapidOcr();
         
         // InitModels es sincrono y pesado, se despacha a un thread pool para no bloquear el caller
         await Task.Run(() => nativeEngine.InitModels(
@@ -39,7 +39,7 @@ public sealed class OcrEngine : IOcrEngine
                 keysPath: paths.DictionaryPath),
             cancellationToken);
 
-        return new OcrEngine(nativeEngine, options ?? RapidOcrOptions.Default);
+        return new Ocr(nativeEngine, options ?? RapidOcrOptions.Default);
     }
 
     public async Task<Neni.Abstractions.Entities.OcrResult> DetectAsync(Frame frame,
@@ -53,6 +53,12 @@ public sealed class OcrEngine : IOcrEngine
             cancellationToken);
 
         return MapToAbstraction(native);
+    }
+
+    public string NormalizeText(string text, Languages sourceLanguage)
+    {
+        // TODO: Implementar lógica de normalización de texto según el idioma de origen.
+        return text;
     }
 
     public async ValueTask DisposeAsync()
