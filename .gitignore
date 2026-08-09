@@ -33,4 +33,5 @@ secrets.json
 Thumbs.db
 .DS_Store
 
-Neni.Ocr/Test/
+Neni.Tests/Ocr/Frames
+CLAUDE.md

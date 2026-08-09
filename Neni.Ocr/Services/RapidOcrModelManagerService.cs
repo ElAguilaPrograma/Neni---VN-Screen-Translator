@@ -1,3 +1,5 @@
+using Neni.Abstractions.Interfaces;
+
 namespace Neni.Ocr.Services;
 
 public enum RapidOcrVersion
@@ -21,14 +23,19 @@ public sealed class RapidOcrModelManagerService
     private const string V5_ClsFileName = "ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx";
     private const string V5_RecFileName = "ch_PP-OCRv5_rec_mobile.onnx";
     private const string V5_DictFileName = "ppocrv5_dict.txt";
-
     private readonly string _modelsRootPath;
     private readonly HttpClient _httpClient;
 
-    public RapidOcrModelManagerService(string modelsRootPath = "Models", HttpClient httpClient = null)
+    public RapidOcrModelManagerService(string modelsRootPath = "Models", HttpClient? httpClient = null)
     {
         _modelsRootPath = modelsRootPath;
-        _httpClient = httpClient;
+        _httpClient = httpClient ?? new HttpClient();
+
+        // ModelScope's CDN (Tengine) devuelve 403 "denied by UA ACL = blacklist" a requests
+        // sin User-Agent, que es lo que HttpClient envia por defecto. Sin este header la
+        // descarga falla siempre, sin importar que la URL firmada sea valida.
+        if (!_httpClient.DefaultRequestHeaders.UserAgent.Any())
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Neni-VN-Screen-Translator/1.0");
     }
     
     // Verifica que los modelos de la version solicitada existe en disco

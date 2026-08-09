@@ -7,14 +7,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="RapidOcrNet" Version="3.0.0" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Models\PP-OCRv5\" />
-    </ItemGroup>
-
-    <ItemGroup>
       <ProjectReference Include="..\Neni.Abstractions\Neni.Abstractions.csproj" />
     </ItemGroup>
 
