@@ -1,3 +1,4 @@
+using Neni.Abstractions.Entities;
 using Neni.Abstractions.Interfaces;
 using Neni.Application.Interfaces;
 
@@ -13,12 +14,12 @@ public sealed class Initialize : IInitialize
     private readonly IOcrEngineFactory _ocrEngineFactory;
     private readonly ITranslatorEngineFactory _translatorEngineFactory;
 
-    public ISettings Setting { get; set; } = null!;
+    public Settings AppSettings { get; private set; } = null!;
     public IOcr Engine { get; private set; } = null!;
     public ITranslator Translator { get; private set; } = null!;
 
-    public Initialize(IOcrEngineFactory ocrEngineFactory, 
-        ITranslatorEngineFactory translatorEngineFactory, 
+    public Initialize(IOcrEngineFactory ocrEngineFactory,
+        ITranslatorEngineFactory translatorEngineFactory,
         ISettings settings)
     {
         _ocrEngineFactory = ocrEngineFactory;
@@ -28,8 +29,7 @@ public sealed class Initialize : IInitialize
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        // TODO: El servicio que implemente las configuraciones debera instanciar esta clase llamar a .Load() y inicializar cada configuración.
-        Setting = _settings;
+        AppSettings = _settings.Load();
         Engine = await _ocrEngineFactory.CreateAsync(cancellationToken);
         Translator = await _translatorEngineFactory.CreateAsync(cancellationToken);
     }

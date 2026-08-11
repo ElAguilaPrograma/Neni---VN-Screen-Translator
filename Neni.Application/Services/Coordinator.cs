@@ -3,25 +3,27 @@ using Neni.Abstractions.Entities;
 using Neni.Abstractions.Enums;
 using Neni.Application.Interfaces;
 using Neni.Application.DataTransferObjets;
+using System.Diagnostics;
 
 namespace Neni.Application.Services;
 
-// TODO Implementar la interfaz
 public class Coordinator : ICoordinator
 {
     private readonly Initialize _initialize;
     private readonly IDeduplication _deduplication;
-    private readonly Settings _settings;
     private readonly IWindowLocator _windowLocator;
     private readonly IRegionOfInterest _regionOfInterest;
     private readonly IOverlay _overlay;
     private readonly IFrameCapture _frameCapture;
     private readonly IFrameProcessor _frameProcessor;
+    private readonly Stopwatch stopwatch = new Stopwatch();
     private OcrResult _ocrResult = new OcrResult([]);
     private List<RegionOfInterest> _activeRoisOverlay = new List<RegionOfInterest>();
     private bool _isActive = false;
     private bool _overlaySession = false;
-    private Frame? _lastFrame = null;
+    private Dictionary<int, Frame> _lastFrames = new Dictionary<int, Frame>();
+    private Dictionary<int, string> _translationTexts = new Dictionary<int, string>();
+    private Dictionary<string, string> _translationCache = new Dictionary<string, string>();
 
     public Coordinator(Initialize initialize,
         IDeduplication deduplication,
@@ -33,7 +35,6 @@ public class Coordinator : ICoordinator
     {
         _initialize = initialize;
         _deduplication = deduplication;
-        _settings = _initialize.Setting.Load();
         _windowLocator = windowLocator;
         _regionOfInterest = regionOfInterest;
         _overlay = overlay;
@@ -50,18 +51,26 @@ public class Coordinator : ICoordinator
         =>  _windowLocator.GetWindowInfo(handle);
 
     // Obtenemos las regiones de interés activas para la ventana objetivo seleccionada por el usuario
-    public async Task<RegionOfInterest> GetRegionOfInterestAsync(Frame frame, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<RegionOfInterest>> GetRegionOfInterestAsync(Frame frame, CancellationToken cancellationToken = default)
         => await _regionOfInterest.DrawRoisAsync(frame, cancellationToken);
 
-    // Eliminamos una región de interés específica identificada por su ID
-    // TODO: _activeRoisOverlay debe ser publico para que pueda ser accedido desde la capa de presentación y se pueda eliminar el overlay correspondiente a la ROI eliminada.
+    // Eliminamos una región de interés específica identificada por su ID, junto con su overlay
+    // y el estado en caché (último frame, última traducción) que quedó asociado a esa ROI.
     public void DeleteRegionOfInterest(int roiId)
-        => _regionOfInterest.DeleteRoi(roiId);
+    {
+        _regionOfInterest.DeleteRoi(roiId);
+        _overlay.RemoveOverlayContent(roiId);
+        _activeRoisOverlay.RemoveAll(r => r.RoiId == roiId);
+        _lastFrames.Remove(roiId);
+        _translationTexts.Remove(roiId);
+    }
 
     // Inicia la ejecución la pipeline
     public async Task StartCycle(IntPtr targetWindowHandle, IEnumerable<RegionOfInterestDto>? activeRoisDto = null)
     {
-        var interval = _settings.TimerCycleInterval;
+        EnsureInitialized();
+
+        var interval = _initialize.AppSettings.TimerCycleInterval;
 
         if  (interval <= 0)
             throw new ArgumentOutOfRangeException(nameof(interval), "El intervalo de tiempo debe ser mayor a 0.");
@@ -69,7 +78,18 @@ public class Coordinator : ICoordinator
         this._isActive = true;
         this._overlaySession = true;
         await _overlay.InitializeAsync(targetWindowHandle);
-        await this.ProcessCycle(activeRoisDto);
+
+        // Se ejecuta indefinidamente (hasta StopCycle) procesando un ciclo aprox. cada "interval" ms,
+        // descontando el tiempo que el propio ProcessCycle tarda en correr.
+        while (this._isActive)
+        {
+            stopwatch.Restart();
+            await this.ProcessCycle(activeRoisDto);
+
+            var remaining = interval - stopwatch.ElapsedMilliseconds;
+            if (remaining > 0 && this._isActive)
+                await Task.Delay((int)remaining);
+        }
     }
 
     // Detiene la ejecución de la pipeline
@@ -77,8 +97,10 @@ public class Coordinator : ICoordinator
     {
         if (!this._isActive)
             return;
-        
+
+        stopwatch.Stop();
         this._isActive = false;
+        this._overlaySession = false;
         await _overlay.StopAsync();
         this._overlaySession = false;
         _activeRoisOverlay.Clear();
@@ -86,10 +108,12 @@ public class Coordinator : ICoordinator
     }
 
     // Ejecuta un ciclo de captura y procesamiento de frames, si la pipeline está activa y la sesión de overlay está activa.
-    // Solo devuelve un string el modo esta en ventana acompañante, en caso contrario devuelve null pues el overlay ya dibujara el texto traducido. 
-    // El string devuelto es el texto traducido.
-    public async Task<string?> ProcessCycle(IEnumerable<RegionOfInterestDto>? activeRoisDto = null)
+    // Devuelve un diccionario con los textos traducidos para cada ROI procesada, 
+    // o null si no hay ROIs activas o si la pipeline no está activa.
+    public async Task<Dictionary<int, string>?> ProcessCycle(IEnumerable<RegionOfInterestDto>? activeRoisDto = null)
     {
+        EnsureInitialized();
+
         var activeRois = activeRoisDto?.Select(MapRegionOfInterestDtoToRegionOfInterest).ToList();
 
         if (!this._isActive || !this._overlaySession)
@@ -105,18 +129,52 @@ public class Coordinator : ICoordinator
             return null;
         }
 
+        Frame windowFrame = await _frameCapture.GrabFrameAsync();
+        string translatedText = string.Empty;
+
         foreach (var roi in activeRois)
         {
-            await this.CaptureAndDispatch(roi);
+            await this.CaptureAndDispatch(roi, windowFrame);
             if (_ocrResult == null || string.IsNullOrWhiteSpace(_ocrResult.FullText))
             {
                 Console.WriteLine("No OCR output detected. Skipping normalization.");
-                return null;
+                continue;
             }
 
-            var ocrText = _initialize.Engine.NormalizeText(_ocrResult.FullText, _settings.SourceLanguage);
+            var ocrText = _initialize.Engine.NormalizeText(_ocrResult.FullText, _initialize.AppSettings.SourceLanguage);
 
-            string translatedText = await _initialize.Translator.TranslateAsync(ocrText, _settings.SourceLanguage, _settings.TargetLanguage);
+            if (_translationCache.TryGetValue(ocrText, out string? cachedTranslation))
+            {
+                // Solo para quitar el warning, en teorio cachedTranslation nunca debería ser null, 
+                // porque si está en el diccionario, tiene que tener un valor asociado.
+                translatedText = cachedTranslation ?? string.Empty;
+
+                if (_translationTexts.ContainsKey(roi.RoiId))
+                {
+                    _translationTexts[roi.RoiId] = translatedText;
+                }
+                else
+                {
+                    _translationTexts.Add(roi.RoiId, translatedText);
+                }
+            }
+            else
+            {
+                translatedText = await _initialize.Translator.TranslateAsync(
+                    ocrText, 
+                    _initialize.AppSettings.SourceLanguage, 
+                    _initialize.AppSettings.TargetLanguage);
+                _translationCache[ocrText] = translatedText;
+
+                if (_translationTexts.ContainsKey(roi.RoiId))
+                {
+                    _translationTexts[roi.RoiId] = translatedText;
+                }
+                else
+                {
+                    _translationTexts.Add(roi.RoiId, translatedText);
+                }
+            }
 
             // TODO: Si en la ROI hay más de un bloque de texto, se debe de iterar sobre cada bloque y dibujar cada uno en el overlay, actualmente solo se dibuja el primer bloque.
             OcrTextBlock ocrTextBlock = _ocrResult.Blocks[0];
@@ -125,10 +183,12 @@ public class Coordinator : ICoordinator
 
             if (overlayCapibility == OverlayCapability.CompanionWindowOnly)
             {
-                return translatedText;
+                // Sin overlay directo disponible: el texto traducido ya quedó en _translationTexts para esta ROI,
+                // seguimos con el resto sin intentar dibujar overlay.
+                continue;
             }
 
-            if (_activeRoisOverlay.Contains(roi))
+            if (_activeRoisOverlay.Any(r => r.RoiId == roi.RoiId))
             {
                 // Si ya existe un overlay para esta ROI, actualizamos el contenido del overlay con el nuevo texto traducido y los bounds de la ventana objetivo
                 var overlayItem = new TranslationOverlayItem(
@@ -163,7 +223,15 @@ public class Coordinator : ICoordinator
                 _activeRoisOverlay.Add(roi);
             }
         }
-        return null;
+        return _translationTexts;
+    }
+
+    // _initialize.AppSettings/Engine/Translator solo quedan listos después de InitializeAsync();
+    // si alguien llama StartCycle/ProcessCycle antes de eso, fallamos con un mensaje claro en vez de un NRE opaco.
+    private void EnsureInitialized()
+    {
+        if (_initialize.AppSettings is null)
+            throw new InvalidOperationException("Initialize.InitializeAsync() debe ser invocado (y esperado) antes de iniciar el ciclo.");
     }
 
     // Mover este mapper a una carpeta de Helpers o Utils, para que pueda ser reutilizado en otras partes del proyecto si es necesario.
@@ -177,7 +245,7 @@ public class Coordinator : ICoordinator
             regionOfInterestDto.Scale);
 
     // Captura el frame de la ventana objetivo, recorta las regiones de interés activas y las envía al motor OCR para su procesamiento.
-    private async Task CaptureAndDispatch(RegionOfInterest roi, bool forceRun = false)
+    private async Task CaptureAndDispatch(RegionOfInterest roi, Frame windowFrame, bool forceRun = false)
     {
         if (roi == null)
         {
@@ -185,7 +253,6 @@ public class Coordinator : ICoordinator
             return;
         }
 
-        Frame windowFrame = await _frameCapture.GrabFrameAsync();
         if (windowFrame == null)
         {
             Console.WriteLine("Failed to capture window frame. Skipping dispatch.");
@@ -204,14 +271,21 @@ public class Coordinator : ICoordinator
 
             var processedFrame = _frameProcessor.ProcessFrames(croppedFrame);
 
-            if(!forceRun && _deduplication.IsDuplicate(processedFrame, _lastFrame))
+            if(!forceRun && _deduplication.IsDuplicate(processedFrame, _lastFrames.GetValueOrDefault(roi.RoiId)))
             {
                 Console.WriteLine($"Duplicate frame detected for ROI: {roi}. Skipping dispatch.");
                 return;
             }
 
             _ocrResult = await _initialize.Engine.DetectAsync(processedFrame);
-            _lastFrame = processedFrame;
+            if (_lastFrames.ContainsKey(roi.RoiId))
+            {
+                _lastFrames[roi.RoiId] = processedFrame;
+            }
+            else
+            {
+                _lastFrames.Add(roi.RoiId, processedFrame);
+            }
 
             return;
         }

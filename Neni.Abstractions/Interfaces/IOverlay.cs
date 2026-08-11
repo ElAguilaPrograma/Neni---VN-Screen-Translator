@@ -13,6 +13,8 @@ public interface IOverlay : IAsyncDisposable
     Task RenderTranslationOverlayAsync(IEnumerable<TranslationOverlayItem> items);
     // Actualiza el contenido de la superposición con un solo elemento de traducción, permitiendo cambios dinámicos en la visualización sin necesidad de volver a renderizar toda la superposición.
     void UpdateOverlayContent(TranslationOverlayItem item);
+    // Elimina un elemento de traducción específico de la superposición, identificado por su ID, eliminando su visualización de la pantalla.
+    void RemoveOverlayContent(int itemId);
     // Obtiene la capacidad actual de la superposición.
     OverlayCapability CurrentOverlayCapability { get; }
 }

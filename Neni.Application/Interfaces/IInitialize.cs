@@ -1,10 +1,11 @@
+using Neni.Abstractions.Entities;
 using Neni.Abstractions.Interfaces;
 
 namespace Neni.Application.Interfaces;
 
 public interface IInitialize
 {
-    ISettings Setting { get; set; }
+    Settings AppSettings { get; }
     IOcr Engine { get; }
     ITranslator Translator { get; }
 
