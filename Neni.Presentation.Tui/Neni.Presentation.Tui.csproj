@@ -11,4 +11,9 @@
       <PackageReference Include="Spectre.Console.Cli" Version="0.55.0" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\Neni.Application\Neni.Application.csproj" />
+      <ProjectReference Include="..\Neni.Ocr\Neni.Ocr.csproj" />
+    </ItemGroup>
+
 </Project>

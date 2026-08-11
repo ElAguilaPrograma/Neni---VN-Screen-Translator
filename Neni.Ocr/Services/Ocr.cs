@@ -27,7 +27,7 @@ public sealed class Ocr : IOcr
         RapidOcrOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        RapidOcrModelPaths paths = await modelManager.DetectAsync(version, cancellationToken);
+        RapidOcrModelPaths paths = await modelManager.DetectOcrModelAsync(version, cancellationToken);
 
         var nativeEngine = new RapidOcrNet.RapidOcr();
         

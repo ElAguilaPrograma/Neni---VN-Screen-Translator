@@ -1,6 +1,6 @@
-namespace Neni.Abstractions.Entities;
+namespace Neni.Application.DataTransferObjets;
 
-public record RegionOfInterest(
+public record RegionOfInterestDto(
     int RoiId,
     double X,
     double Y,

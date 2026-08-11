@@ -13,5 +13,6 @@ public record Settings(
     double DeduplicationQuanStep = 3,
     bool CompanionWindowEnabled = false,
     double CompanionWindowOpacity = 0.8,
-    Languages TranslationLanguage = Languages.English,
+    Languages SourceLanguage = Languages.English,
+    Languages TargetLanguage = Languages.Spanish,
     TranslationModel TranslationModel = TranslationModel.OpusMt);

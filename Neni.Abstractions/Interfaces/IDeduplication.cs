@@ -4,5 +4,5 @@ namespace Neni.Abstractions.Interfaces;
 
 public interface IDeduplication
 {
-    bool IsDuplicate(Frame frame, Frame previousFrame);
+    bool IsDuplicate(Frame frame, Frame? previousFrame);
 }

@@ -14,6 +14,8 @@ public sealed record RapidOcrModelPaths(
     string RecognitionModelPath,
     string DictionaryPath);
 
+// TODO: Implementar logica para descargar los modelos tiny, small, medium de PP-OCRv6 con los motores de inferencia ONNX, OpenVINO y Paddle.
+// Deprecar o eliminar la descarga de PP-OCRv5 pues PP-OCRv6 es mejor en todo y ya esta publicado en el repo de RapidAI/RapidOCR (default_models.yaml).
 public sealed class RapidOcrModelManagerService
 {
     private const string ModelScopeBaseUrl = "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0";
@@ -39,7 +41,7 @@ public sealed class RapidOcrModelManagerService
     }
     
     // Verifica que los modelos de la version solicitada existe en disco
-    public async Task<RapidOcrModelPaths> DetectAsync(RapidOcrVersion rapidOcrVersion,
+    public async Task<RapidOcrModelPaths> DetectOcrModelAsync(RapidOcrVersion rapidOcrVersion,
         CancellationToken cancellationToken = default)
     {
         return rapidOcrVersion switch
