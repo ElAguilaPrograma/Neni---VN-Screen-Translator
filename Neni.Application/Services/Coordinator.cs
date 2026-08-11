@@ -17,13 +17,14 @@ public class Coordinator : ICoordinator
     private readonly IFrameCapture _frameCapture;
     private readonly IFrameProcessor _frameProcessor;
     private readonly Stopwatch stopwatch = new Stopwatch();
-    private OcrResult _ocrResult = new OcrResult([]);
-    private List<RegionOfInterest> _activeRoisOverlay = new List<RegionOfInterest>();
     private bool _isActive = false;
     private bool _overlaySession = false;
     private Dictionary<int, Frame> _lastFrames = new Dictionary<int, Frame>();
     private Dictionary<int, string> _translationTexts = new Dictionary<int, string>();
     private Dictionary<string, string> _translationCache = new Dictionary<string, string>();
+    // Ids de overlay actualmente en pantalla, por RoiId. Un ROI puede generar varios
+    // items de overlay (uno por bloque de texto detectado por el OCR).
+    private Dictionary<int, HashSet<int>> _activeOverlayItemIdsByRoi = new Dictionary<int, HashSet<int>>();
 
     public Coordinator(Initialize initialize,
         IDeduplication deduplication,
@@ -59,8 +60,15 @@ public class Coordinator : ICoordinator
     public void DeleteRegionOfInterest(int roiId)
     {
         _regionOfInterest.DeleteRoi(roiId);
-        _overlay.RemoveOverlayContent(roiId);
-        _activeRoisOverlay.RemoveAll(r => r.RoiId == roiId);
+
+        if (_activeOverlayItemIdsByRoi.TryGetValue(roiId, out var overlayItemIds))
+        {
+            foreach (var overlayItemId in overlayItemIds)
+                _overlay.RemoveOverlayContent(overlayItemId);
+
+            _activeOverlayItemIdsByRoi.Remove(roiId);
+        }
+
         _lastFrames.Remove(roiId);
         _translationTexts.Remove(roiId);
     }
@@ -103,7 +111,7 @@ public class Coordinator : ICoordinator
         this._overlaySession = false;
         await _overlay.StopAsync();
         this._overlaySession = false;
-        _activeRoisOverlay.Clear();
+        _activeOverlayItemIdsByRoi.Clear();
         _regionOfInterest.ClearRois();
     }
 
@@ -130,69 +138,53 @@ public class Coordinator : ICoordinator
         }
 
         Frame windowFrame = await _frameCapture.GrabFrameAsync();
-        string translatedText = string.Empty;
 
         foreach (var roi in activeRois)
         {
-            await this.CaptureAndDispatch(roi, windowFrame);
-            if (_ocrResult == null || string.IsNullOrWhiteSpace(_ocrResult.FullText))
+            var ocrResult = await this.CaptureAndDispatch(roi, windowFrame);
+            if (ocrResult == null)
             {
-                Console.WriteLine("No OCR output detected. Skipping normalization.");
+                // Sin cambio de frame para esta ROI (o error): no tocamos su overlay existente.
                 continue;
             }
 
-            var ocrText = _initialize.Engine.NormalizeText(_ocrResult.FullText, _initialize.AppSettings.SourceLanguage);
-
-            if (_translationCache.TryGetValue(ocrText, out string? cachedTranslation))
-            {
-                // Solo para quitar el warning, en teorio cachedTranslation nunca debería ser null, 
-                // porque si está en el diccionario, tiene que tener un valor asociado.
-                translatedText = cachedTranslation ?? string.Empty;
-
-                if (_translationTexts.ContainsKey(roi.RoiId))
-                {
-                    _translationTexts[roi.RoiId] = translatedText;
-                }
-                else
-                {
-                    _translationTexts.Add(roi.RoiId, translatedText);
-                }
-            }
-            else
-            {
-                translatedText = await _initialize.Translator.TranslateAsync(
-                    ocrText, 
-                    _initialize.AppSettings.SourceLanguage, 
-                    _initialize.AppSettings.TargetLanguage);
-                _translationCache[ocrText] = translatedText;
-
-                if (_translationTexts.ContainsKey(roi.RoiId))
-                {
-                    _translationTexts[roi.RoiId] = translatedText;
-                }
-                else
-                {
-                    _translationTexts.Add(roi.RoiId, translatedText);
-                }
-            }
-
-            // TODO: Si en la ROI hay más de un bloque de texto, se debe de iterar sobre cada bloque y dibujar cada uno en el overlay, actualmente solo se dibuja el primer bloque.
-            OcrTextBlock ocrTextBlock = _ocrResult.Blocks[0];
-            IReadOnlyList<TextPoint> boxPoints = ocrTextBlock.BoxPoints;
             var overlayCapibility = _overlay.CurrentOverlayCapability;
+            var orderedBlocks = OrderBlocksReadingOrder(ocrResult.Blocks);
+            var activeOverlayItemIds = _activeOverlayItemIdsByRoi.GetValueOrDefault(roi.RoiId);
+            var currentOverlayItemIds = new HashSet<int>();
+            var roiTranslatedLines = new List<string>();
+            var newOverlayItems = new List<TranslationOverlayItem>();
 
-            if (overlayCapibility == OverlayCapability.CompanionWindowOnly)
+            for (var blockIndex = 0; blockIndex < orderedBlocks.Count; blockIndex++)
             {
-                // Sin overlay directo disponible: el texto traducido ya quedó en _translationTexts para esta ROI,
-                // seguimos con el resto sin intentar dibujar overlay.
-                continue;
-            }
+                var block = orderedBlocks[blockIndex];
+                var ocrText = _initialize.Engine.NormalizeText(block.Text, _initialize.AppSettings.SourceLanguage);
+                if (string.IsNullOrWhiteSpace(ocrText))
+                    continue;
 
-            if (_activeRoisOverlay.Any(r => r.RoiId == roi.RoiId))
-            {
-                // Si ya existe un overlay para esta ROI, actualizamos el contenido del overlay con el nuevo texto traducido y los bounds de la ventana objetivo
+                if (!_translationCache.TryGetValue(ocrText, out var translatedText))
+                {
+                    translatedText = await _initialize.Translator.TranslateAsync(
+                        ocrText,
+                        _initialize.AppSettings.SourceLanguage,
+                        _initialize.AppSettings.TargetLanguage);
+                    _translationCache[ocrText] = translatedText;
+                }
+
+                roiTranslatedLines.Add(translatedText);
+
+                if (overlayCapibility == OverlayCapability.CompanionWindowOnly)
+                {
+                    // Sin overlay directo disponible: el texto traducido ya quedó acumulado arriba.
+                    continue;
+                }
+
+                IReadOnlyList<TextPoint> boxPoints = block.BoxPoints;
+                var overlayItemId = MakeOverlayItemId(roi.RoiId, blockIndex);
+                currentOverlayItemIds.Add(overlayItemId);
+
                 var overlayItem = new TranslationOverlayItem(
-                    roi.RoiId,
+                    overlayItemId,
                     ocrText,
                     translatedText,
                     new WindowBounds(
@@ -201,27 +193,30 @@ public class Coordinator : ICoordinator
                         (int)(boxPoints[2].X - boxPoints[0].X),
                         (int)(boxPoints[2].Y - boxPoints[0].Y)));
 
-                _overlay.UpdateOverlayContent(overlayItem);
-            }
-            else
-            {
-                // Crear un objeto TranslationOverlayItem con el texto original, el texto traducido y los bounds de la ventana objetivo
-                var overlayItem = new List<TranslationOverlayItem>
+                if (activeOverlayItemIds != null && activeOverlayItemIds.Contains(overlayItemId))
                 {
-                    new TranslationOverlayItem(
-                        roi.RoiId,
-                        ocrText,
-                        translatedText,
-                        new WindowBounds(
-                            (int)boxPoints[0].X,
-                            (int)boxPoints[0].Y,
-                            (int)(boxPoints[2].X - boxPoints[0].X),
-                            (int)(boxPoints[2].Y - boxPoints[0].Y)))
-                };
-
-                await _overlay.RenderTranslationOverlayAsync(overlayItem);
-                _activeRoisOverlay.Add(roi);
+                    // Ya existe un overlay para este bloque: actualizamos su contenido.
+                    _overlay.UpdateOverlayContent(overlayItem);
+                }
+                else
+                {
+                    newOverlayItems.Add(overlayItem);
+                }
             }
+
+            if (newOverlayItems.Count > 0)
+                await _overlay.RenderTranslationOverlayAsync(newOverlayItems);
+
+            // Bloques que estaban en pantalla el ciclo anterior para esta ROI y ya no aparecieron
+            // (opción de menú cerrada, texto acortado, etc.): eliminamos su overlay.
+            if (activeOverlayItemIds != null)
+            {
+                foreach (var staleId in activeOverlayItemIds.Except(currentOverlayItemIds))
+                    _overlay.RemoveOverlayContent(staleId);
+            }
+
+            _activeOverlayItemIdsByRoi[roi.RoiId] = currentOverlayItemIds;
+            _translationTexts[roi.RoiId] = string.Join(Environment.NewLine, roiTranslatedLines);
         }
         return _translationTexts;
     }
@@ -244,19 +239,31 @@ public class Coordinator : ICoordinator
             regionOfInterestDto.H,
             regionOfInterestDto.Scale);
 
-    // Captura el frame de la ventana objetivo, recorta las regiones de interés activas y las envía al motor OCR para su procesamiento.
-    private async Task CaptureAndDispatch(RegionOfInterest roi, Frame windowFrame, bool forceRun = false)
+    // Id determinístico y estable para el overlay de un bloque de texto dentro de una ROI, derivado
+    // de RoiId y la posición del bloque (de arriba hacia abajo) en el resultado de OCR de este ciclo.
+    // Asume RoiId pequeño (Settings.MaxPendingRois = 8) y como máximo unos pocos cientos de bloques por ROI.
+    private static int MakeOverlayItemId(int roiId, int blockIndex)
+        => roiId * 1000 + blockIndex;
+
+    // Ordena los bloques de texto de arriba hacia abajo para que el índice de cada bloque
+    // se mantenga estable entre ciclos y así pueda usarse en MakeOverlayItemId.
+    private static IReadOnlyList<OcrTextBlock> OrderBlocksReadingOrder(IReadOnlyList<OcrTextBlock> blocks)
+        => blocks.OrderBy(b => b.BoxPoints[0].Y).ThenBy(b => b.BoxPoints[0].X).ToList();
+
+    // Captura el frame de la ventana objetivo, recorta la región de interés y la envía al motor OCR para su procesamiento.
+    // Devuelve null si no hubo cambio de frame para esta ROI (deduplicación) o si ocurrió un error.
+    private async Task<OcrResult?> CaptureAndDispatch(RegionOfInterest roi, Frame windowFrame, bool forceRun = false)
     {
         if (roi == null)
         {
             Console.WriteLine("No active ROIs provided. Skipping capture and dispatch.");
-            return;
+            return null;
         }
 
         if (windowFrame == null)
         {
             Console.WriteLine("Failed to capture window frame. Skipping dispatch.");
-            return;
+            return null;
         }
 
         try
@@ -266,7 +273,7 @@ public class Coordinator : ICoordinator
             if (croppedFrame == null)
             {
                 Console.WriteLine($"Failed to crop frame for ROI: {roi}. Skipping this ROI.");
-                return;
+                return null;
             }
 
             var processedFrame = _frameProcessor.ProcessFrames(croppedFrame);
@@ -274,26 +281,19 @@ public class Coordinator : ICoordinator
             if(!forceRun && _deduplication.IsDuplicate(processedFrame, _lastFrames.GetValueOrDefault(roi.RoiId)))
             {
                 Console.WriteLine($"Duplicate frame detected for ROI: {roi}. Skipping dispatch.");
-                return;
+                return null;
             }
 
-            _ocrResult = await _initialize.Engine.DetectAsync(processedFrame);
-            if (_lastFrames.ContainsKey(roi.RoiId))
-            {
-                _lastFrames[roi.RoiId] = processedFrame;
-            }
-            else
-            {
-                _lastFrames.Add(roi.RoiId, processedFrame);
-            }
+            var ocrResult = await _initialize.Engine.DetectAsync(processedFrame);
+            _lastFrames[roi.RoiId] = processedFrame;
 
-            return;
+            return ocrResult;
         }
 
         catch (Exception ex)
         {
             Console.WriteLine($"Error during OCR processing: {ex.Message}");
-            return;
+            return null;
         }
     }
 }
