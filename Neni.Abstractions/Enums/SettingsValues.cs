@@ -28,3 +28,10 @@ public enum OcrEngine
     OpenVino = 2,
     Paddle = 3
 }
+
+public enum OcrModelSize
+{
+    Tiny = 1,
+    Small = 2,
+    Medium = 3
+}

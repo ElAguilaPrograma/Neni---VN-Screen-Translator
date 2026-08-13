@@ -20,17 +20,17 @@ public sealed class Ocr : IOcr
         _options = options;
     }
     
-    // Crea y carga un motor RapidOcr. Resuelve los modelos de la versión indicada antes de devolver la instancia
+    // Crea y carga un motor RapidOcr. Resuelve los modelos de PP-OCRv6 del tamaño indicado antes de devolver la instancia
     public static async Task<Ocr> CreateAsync(
         RapidOcrModelManagerService modelManager,
-        RapidOcrVersion version = RapidOcrVersion.V5,
+        OcrModelSize modelSize = OcrModelSize.Tiny,
         RapidOcrOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        RapidOcrModelPaths paths = await modelManager.DetectOcrModelAsync(version, cancellationToken);
+        RapidOcrModelPaths paths = await modelManager.DetectOcrModelAsync(modelSize, cancellationToken);
 
         var nativeEngine = new RapidOcrNet.RapidOcr();
-        
+
         // InitModels es sincrono y pesado, se despacha a un thread pool para no bloquear el caller
         await Task.Run(() => nativeEngine.InitModels(
                 detPath: paths.DetectionModelPath,
@@ -39,7 +39,18 @@ public sealed class Ocr : IOcr
                 keysPath: paths.DictionaryPath),
             cancellationToken);
 
-        return new Ocr(nativeEngine, options ?? RapidOcrOptions.Default);
+        // El preset RapidOcrOptions.PPOCRv6 (recomendado por el README de RapidOcrNet para v6) usa
+        // resize adaptativo por el lado CORTO (LimitSideLen=736, con ImgResize=0), pensado para fotos
+        // donde la imagen de entrada puede ser mas chica que lo que el detector espera. Los ROIs de
+        // Neni son al reves: recortes anchos y bajos (ej. 1413x148, ratio ~9.5:1) tomados directo de
+        // pantalla. Con WidthHeightRatio=8 eso dispara el letterbox vertical y despues el resize
+        // adaptativo escala el lado corto (ya inflado por el letterbox) hasta 736px, mandando al
+        // detector una imagen ~16x mas grande en pixeles en cada frame — medido: 251ms (v5+Default)
+        // vs 1971ms (v6+PPOCRv6) vs 349ms (v6+PPOCRv6 con ImgResize=1024) sobre las mismas 10 imagenes.
+        // Se mantiene el resto del preset v6 (sin borde blanco, letterbox) pero se reimpone el recorte
+        // por lado largo de Default para que el detector nunca upscalee un recorte que ya viene a
+        // resolucion de pantalla.
+        return new Ocr(nativeEngine, options ?? RapidOcrOptions.PPOCRv6 with { ImgResize = 1024 });
     }
 
     public async Task<Neni.Abstractions.Entities.OcrResult> DetectAsync(Frame frame,

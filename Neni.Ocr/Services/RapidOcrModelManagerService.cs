@@ -1,12 +1,7 @@
+using Neni.Abstractions.Enums;
 using Neni.Abstractions.Interfaces;
 
 namespace Neni.Ocr.Services;
-
-public enum RapidOcrVersion
-{
-    V5,
-    V6
-}
 
 public sealed record RapidOcrModelPaths(
     string DetectionModelPath,
@@ -14,17 +9,16 @@ public sealed record RapidOcrModelPaths(
     string RecognitionModelPath,
     string DictionaryPath);
 
-// TODO: Implementar logica para descargar los modelos tiny, small, medium de PP-OCRv6 con los motores de inferencia ONNX, OpenVINO y Paddle.
-// Deprecar o eliminar la descarga de PP-OCRv5 pues PP-OCRv6 es mejor en todo y ya esta publicado en el repo de RapidAI/RapidOCR (default_models.yaml).
+// Gestiona los modelos de PP-OCRv6 (tiny/small/medium). PP-OCRv6 no publica un clasificador
+// de orientacion propio, asi que se reutiliza el clasificador de PP-OCRv5 como dependencia
+// compartida entre los 3 tamaños (ver README de RapidOcrNet).
 public sealed class RapidOcrModelManagerService
 {
-    private const string ModelScopeBaseUrl = "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0";
-    
-    // Nombres de archivo para PP-OCRv5
-    private const string V5_DetFileName = "ch_PP-OCRv5_det_mobile.onnx";
-    private const string V5_ClsFileName = "ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx";
-    private const string V5_RecFileName = "ch_PP-OCRv5_rec_mobile.onnx";
-    private const string V5_DictFileName = "ppocrv5_dict.txt";
+    private const string ModelScopeBaseUrl = "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2";
+
+    // Clasificador de orientacion (180°) heredado de PP-OCRv5: PP-OCRv6 no publica uno propio.
+    private const string ClsFileName = "ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx";
+
     private readonly string _modelsRootPath;
     private readonly HttpClient _httpClient;
 
@@ -39,69 +33,49 @@ public sealed class RapidOcrModelManagerService
         if (!_httpClient.DefaultRequestHeaders.UserAgent.Any())
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Neni-VN-Screen-Translator/1.0");
     }
-    
-    // Verifica que los modelos de la version solicitada existe en disco
-    public async Task<RapidOcrModelPaths> DetectOcrModelAsync(RapidOcrVersion rapidOcrVersion,
+
+    // Verifica que los modelos de PP-OCRv6 del tamaño solicitado existan en disco (descarga lo que falte)
+    public async Task<RapidOcrModelPaths> DetectOcrModelAsync(OcrModelSize modelSize,
         CancellationToken cancellationToken = default)
     {
-        return rapidOcrVersion switch
-        {
-            RapidOcrVersion.V5 => await DetectV5Async(cancellationToken),
-            RapidOcrVersion.V6 => throw new NotSupportedException(
-                "PP-OCRv6 todavia no esta publicada en el repo de RapidAI/RapidOCR" +
-                "(default_models.yaml). Actualiza esta clase con los nombres de archivo" +
-                "y URLs cuando esten disponibles"),
-            _ => throw new ArgumentOutOfRangeException(nameof(rapidOcrVersion), rapidOcrVersion, null)
-        };
-    }
-
-    // Detecta que la v5 de RapidOcr este en el disco no la descarga y retorna la rutas
-    private async Task<RapidOcrModelPaths> DetectV5Async(CancellationToken cancellationToken)
-    {
-        string folder = Path.Combine(_modelsRootPath, "PP-OCRv5");
-        
-        string detPath = Path.Combine(folder, V5_DetFileName);
-        string clsPath = Path.Combine(folder, V5_ClsFileName);
-        string recPath = Path.Combine(folder, V5_RecFileName);
-        string dictPath = Path.Combine(folder, V5_DictFileName);
-        
-        bool allModelsExist =
-            File.Exists(detPath) &&
-            File.Exists(clsPath) &&
-            File.Exists(recPath) &&
-            File.Exists(dictPath);
-
-        if (!allModelsExist)
-            await DownloadOnnxPPOCRv5Async(folder, cancellationToken);
-        
-        return new RapidOcrModelPaths(detPath, clsPath, recPath, dictPath);
-    }
-    
-    // Descarga los 4 archivos necesarios de PP-OCRv5
-    private async Task DownloadOnnxPPOCRv5Async(string folder, CancellationToken cancellationToken)
-    {
+        string folder = Path.Combine(_modelsRootPath, "PP-OCRv6");
         Directory.CreateDirectory(folder);
 
-        var filesToDownload = new List<(string Filename, string path)>
+        string sizeTag = modelSize.ToString().ToLowerInvariant(); // tiny | small | medium
+
+        string detFileName = $"PP-OCRv6_det_{sizeTag}.onnx";
+        string recFileName = $"PP-OCRv6_rec_{sizeTag}.onnx";
+        string dictFileName = $"ppocrv6_{sizeTag}_dict.txt";
+
+        string detPath = Path.Combine(folder, detFileName);
+        string recPath = Path.Combine(folder, recFileName);
+        string dictPath = Path.Combine(folder, dictFileName);
+        string clsPath = Path.Combine(folder, ClsFileName);
+
+        // En el origen (default_models.yaml), el diccionario de "small" y "medium" se llama
+        // igual para ambos ("ppocrv6_dict.txt", en carpetas distintas); se renombra al guardar
+        // localmente para no pisar uno con el otro. "tiny" ya tiene nombre unico en el origen.
+        string dictRemoteFileName = modelSize == OcrModelSize.Tiny ? "ppocrv6_tiny_dict.txt" : "ppocrv6_dict.txt";
+
+        var filesToDownload = new List<(string DestinationPath, string Url)>
         {
-            (V5_DetFileName, $"{ModelScopeBaseUrl}/onnx/PP-OCRv5/det/{V5_DetFileName}"),
-            (V5_ClsFileName, $"{ModelScopeBaseUrl}/onnx/PP-OCRv5/cls/{V5_ClsFileName}"),
-            (V5_RecFileName, $"{ModelScopeBaseUrl}/onnx/PP-OCRv5/rec/{V5_RecFileName}"),
-            (V5_DictFileName,
-                $"{ModelScopeBaseUrl}/paddle/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile/{V5_DictFileName}"),
+            (detPath, $"{ModelScopeBaseUrl}/onnx/PP-OCRv6/det/{detFileName}"),
+            (recPath, $"{ModelScopeBaseUrl}/onnx/PP-OCRv6/rec/{recFileName}"),
+            (dictPath, $"{ModelScopeBaseUrl}/paddle/PP-OCRv6/rec/PP-OCRv6_rec_{sizeTag}/{dictRemoteFileName}"),
+            (clsPath, $"{ModelScopeBaseUrl}/onnx/PP-OCRv5/cls/{ClsFileName}"),
         };
 
-        foreach (var (filename, url) in filesToDownload)
+        foreach (var (destinationPath, url) in filesToDownload)
         {
-            string destinationPath = Path.Combine(folder, filename);
-            
             if (File.Exists(destinationPath))
                 continue;
-            
-            Console.WriteLine($"[RapidOcrModelManager] Descargando {filename}...");
+
+            Console.WriteLine($"[RapidOcrModelManager] Descargando {Path.GetFileName(destinationPath)}...");
             await DownloadFileAsync(url, destinationPath, cancellationToken);
             Console.WriteLine($"[RapidOcrModelManager] Listo: {destinationPath}");
         }
+
+        return new RapidOcrModelPaths(detPath, clsPath, recPath, dictPath);
     }
 
     // Descarga un archivo temporal primero y al final lo renombra
@@ -118,7 +92,7 @@ public sealed class RapidOcrModelManagerService
         {
             await httpStream.CopyToAsync(fileStream, cancellationToken);
         }
-        
-        File.Move(tempPath, destinationPath, overwrite:true);
+
+        File.Move(tempPath, destinationPath, overwrite: true);
     }
 }

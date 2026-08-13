@@ -5,6 +5,7 @@ namespace Neni.Abstractions.Entities;
 public record Settings(
     InferenceDevice InferenceDevice = InferenceDevice.Cpu,
     OcrEngine OcrEngine = OcrEngine.OnnxRuntime,
+    OcrModelSize OcrModelSize = OcrModelSize.Tiny,
     int MaxPendingRois = 8,
     int TimerCycleInterval = 650,
     double PreprocessScaleFactor = 1.0,

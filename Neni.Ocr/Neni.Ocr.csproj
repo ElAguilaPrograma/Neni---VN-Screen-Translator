@@ -11,7 +11,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Models\PP-OCRv5\" />
+      <Folder Include="Models\PP-OCRv6\" />
     </ItemGroup>
 
     <ItemGroup>
