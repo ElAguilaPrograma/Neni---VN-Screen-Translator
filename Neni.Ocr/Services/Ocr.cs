@@ -66,11 +66,8 @@ public sealed class Ocr : IOcr
         return MapToAbstraction(native);
     }
 
-    public string NormalizeText(string text, Languages sourceLanguage)
-    {
-        // TODO: Implementar lógica de normalización de texto según el idioma de origen.
-        return text;
-    }
+    public string NormalizeText(string text, Languages sourceLanguage) =>
+        TextNormalizer.Normalize(text, TextNormalizer.ScriptFor(sourceLanguage));
 
     public async ValueTask DisposeAsync()
     {
