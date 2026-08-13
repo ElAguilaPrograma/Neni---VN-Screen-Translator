@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.ML.OnnxRuntime;
 using Neni.Abstractions.Entities;
 using Neni.Abstractions.Enums;
 using Neni.Abstractions.Interfaces;
@@ -23,6 +24,7 @@ public sealed class Ocr : IOcr
     // Crea y carga un motor RapidOcr. Resuelve los modelos de PP-OCRv6 del tamaño indicado antes de devolver la instancia
     public static async Task<Ocr> CreateAsync(
         RapidOcrModelManagerService modelManager,
+        Settings appSettings,
         OcrModelSize modelSize = OcrModelSize.Tiny,
         RapidOcrOptions? options = null,
         CancellationToken cancellationToken = default)
@@ -32,12 +34,20 @@ public sealed class Ocr : IOcr
         var nativeEngine = new RapidOcrNet.RapidOcr();
 
         // InitModels es sincrono y pesado, se despacha a un thread pool para no bloquear el caller
-        await Task.Run(() => nativeEngine.InitModels(
+        await Task.Run(() =>
+        {
+            using SessionOptions sessionOptions = ConfigureInferenceSession(appSettings.InferenceDevice, out var actualDevice);
+            Console.WriteLine($"Using inference device: {actualDevice}");
+            // Hay que pasar sessionOptions al overload que la acepta explicitamente:
+            // el overload sin SessionOptions ignora silenciosamente la config de CUDA/CPU
+            // construida arriba y siempre inicializa con el ejecutor CPU por defecto.
+            nativeEngine.InitModels(
                 detPath: paths.DetectionModelPath,
                 clsPath: paths.ClassificationModelPath,
                 recPath: paths.RecognitionModelPath,
-                keysPath: paths.DictionaryPath),
-            cancellationToken);
+                keysPath: paths.DictionaryPath,
+                op: sessionOptions);
+        }, cancellationToken);
 
         // El preset RapidOcrOptions.PPOCRv6 (recomendado por el README de RapidOcrNet para v6) usa
         // resize adaptativo por el lado CORTO (LimitSideLen=736, con ImgResize=0), pensado para fotos
@@ -75,6 +85,28 @@ public sealed class Ocr : IOcr
     {
         _engine.Dispose();
         await Task.CompletedTask;
+    }
+
+    private static SessionOptions ConfigureInferenceSession(InferenceDevice device, out InferenceDevice actualDevice)
+    {
+        var sessionOptions = RapidOcr.GetDefaultSessionOptions();
+        actualDevice = InferenceDevice.Cpu;
+
+        if (device == InferenceDevice.Cuda)
+        {
+            try
+            {
+                Console.WriteLine("Attempting to use CUDA execution provider for ONNX Runtime.");
+                sessionOptions.AppendExecutionProvider_CUDA();
+                actualDevice = InferenceDevice.Cuda;
+            }
+            catch (Exception ex) when (ex is OnnxRuntimeException or EntryPointNotFoundException or DllNotFoundException)
+            {
+                // Log warning: CUDA no esta disponible, se usara CPU.
+                Console.WriteLine($"Warning: CUDA no esta disponible, se usara CPU. Exception: {ex.Message}");
+            }
+        }
+        return sessionOptions;
     }
 
     // Convertir el frame en un SKBitmap que es el formato que espera RapidOcr

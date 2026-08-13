@@ -23,7 +23,7 @@ public sealed class RapidOcrEngineFactory : IOcrEngineFactory
 
     public async Task<IOcr> CreateAsync(CancellationToken cancellationToken = default)
     {
-        var modelSize = _settings.Load().OcrModelSize;
-        return await Ocr.CreateAsync(_modelManager, modelSize, _options, cancellationToken);
+        var appSettings = _settings.Load();
+        return await Ocr.CreateAsync(_modelManager, appSettings, appSettings.OcrModelSize, _options, cancellationToken);
     }
 }

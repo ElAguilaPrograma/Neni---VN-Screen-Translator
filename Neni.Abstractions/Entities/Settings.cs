@@ -3,9 +3,12 @@ using Neni.Abstractions.Enums;
 namespace Neni.Abstractions.Entities;
 
 public record Settings(
-    InferenceDevice InferenceDevice = InferenceDevice.Cpu,
+    InferenceDevice InferenceDevice = InferenceDevice.Cuda,
     OcrEngine OcrEngine = OcrEngine.OnnxRuntime,
-    OcrModelSize OcrModelSize = OcrModelSize.Tiny,
+    // Tiny debe ser usado exclusivamente para CPU, con Cuda da peores resultados. 
+    // Small puede usarse con CPU o Cuda, y es el recomendado para Neni. 
+    // Medium es mas preciso pero considerablemente mas lento, y solo se recomiendan con Cuda.
+    OcrModelSize OcrModelSize = OcrModelSize.Small,
     int MaxPendingRois = 8,
     int TimerCycleInterval = 650,
     double PreprocessScaleFactor = 1.0,

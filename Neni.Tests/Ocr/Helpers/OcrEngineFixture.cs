@@ -1,3 +1,4 @@
+using Neni.Abstractions.Entities;
 using Neni.Abstractions.Enums;
 using Neni.Abstractions.Interfaces;
 using Neni.Ocr.Services;
@@ -13,7 +14,7 @@ public sealed class OcrEngineFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         var modelManager = new RapidOcrModelManagerService();
-        Engine = await Neni.Ocr.Services.Ocr.CreateAsync(modelManager, OcrModelSize.Tiny);
+        Engine = await Neni.Ocr.Services.Ocr.CreateAsync(modelManager, new Settings(), OcrModelSize.Small);
     }
 
     public async Task DisposeAsync()
