@@ -50,7 +50,9 @@ public sealed class Ocr : IOcr
         // Se mantiene el resto del preset v6 (sin borde blanco, letterbox) pero se reimpone el recorte
         // por lado largo de Default para que el detector nunca upscalee un recorte que ya viene a
         // resolucion de pantalla.
-        return new Ocr(nativeEngine, options ?? RapidOcrOptions.PPOCRv6 with { ImgResize = 1024 });
+        // TODO: DoAngle = false es un hack para que el detector no gire los ROIs de Neni, que son siempre horizontales. 
+        // Revisar si el modelo de clasificación es necesario o puede ser omitido para acelerar la descarga inicial y el InitModels.
+        return new Ocr(nativeEngine, options ?? RapidOcrOptions.PPOCRv6 with { DoAngle = false, ImgResize = 1024 });
     }
 
     public async Task<Neni.Abstractions.Entities.OcrResult> DetectAsync(Frame frame,
