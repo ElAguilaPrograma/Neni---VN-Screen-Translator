@@ -6,7 +6,7 @@ namespace Neni.Abstractions.Interfaces;
 public interface IOverlay : IAsyncDisposable
 {
     // Inicializa la superposición de traducción para la ventana objetivo especificada, preparando el entorno para mostrar los elementos de traducción.
-    Task InitializeAsync(IntPtr targetWindowHandle);
+    Task InitializeAsync();
     // Detiene la superposición de traducción, liberando los recursos asociados y cerrando cualquier ventana o elemento visual relacionado con la superposición.
     Task StopAsync();
     // Renderiza los elementos de traducción proporcionados en la superposición, mostrando el texto traducido en las posiciones y estilos especificados.

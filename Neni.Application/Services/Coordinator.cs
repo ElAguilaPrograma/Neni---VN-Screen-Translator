@@ -11,11 +11,11 @@ public class Coordinator : ICoordinator
 {
     private readonly Initialize _initialize;
     private readonly IDeduplication _deduplication;
-    private readonly IWindowLocator _windowLocator;
     private readonly IRegionOfInterest _regionOfInterest;
     private readonly IOverlay _overlay;
     private readonly IFrameCapture _frameCapture;
     private readonly IFrameProcessor _frameProcessor;
+    private readonly ICaptureTargetSelector _targetSelector;
     private readonly Stopwatch stopwatch = new Stopwatch();
     private bool _isActive = false;
     private bool _overlaySession = false;
@@ -28,28 +28,48 @@ public class Coordinator : ICoordinator
 
     public Coordinator(Initialize initialize,
         IDeduplication deduplication,
-        IWindowLocator windowLocator,
         IRegionOfInterest regionOfInterest,
         IOverlay overlay,
         IFrameProcessor frameProcessor,
-        IFrameCapture frameCapture)
+        IFrameCapture frameCapture,
+        ICaptureTargetSelector targetSelector)
     {
         _initialize = initialize;
         _deduplication = deduplication;
-        _windowLocator = windowLocator;
         _regionOfInterest = regionOfInterest;
         _overlay = overlay;
         _frameProcessor = frameProcessor;
         _frameCapture = frameCapture;
+        _targetSelector = targetSelector;
     }
-    
-    // Obtenemos la lista de ventanas disponibles para seleccionar la ventana objetivo
-    public IEnumerable<WindowInfo> GetTargetWindow()
-        => _windowLocator.ListAvailableWindows();
 
-    // Obtenemos la información de la ventana objetivo seleccionada por el usuario
-    public WindowInfo GetTargetWindowInfo(IntPtr handle)
-        =>  _windowLocator.GetWindowInfo(handle);
+    // Llama al selector de ventanas para que el usuario elija la ventana objetivo a traducir.
+    // Devuelve los candidatos: una lista para que la UI monte su propio selector donde se pueden
+    // enumerar ventanas, o como mucho un elemento (vacía si se canceló) donde hay que pasar por el
+    // diálogo nativo del sistema. Quién puede hacer qué lo dice el selector, no esta capa.
+    public async Task<IEnumerable<CaptureTarget>> OpenWindowSelectorAsync(
+        bool reuseLastSelection = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (_targetSelector.SelectionMode == TargetSelectionMode.Enumerable)
+            return await _targetSelector.ListAvailableTargetsAsync(cancellationToken);
+
+        var selectedTarget = await _targetSelector.PromptTargetSelectionAsync(reuseLastSelection, cancellationToken);
+
+        return selectedTarget is null ? [] : [selectedTarget];
+    }
+
+    // Vincula la ventana elegida por el usuario a la sesión de captura, antes de arrancar el ciclo.
+    public async Task AttachToTargetAsync(CaptureTarget target, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        if (!target.IsValid)
+            throw new ArgumentException(
+                "El objetivo de captura no tiene ni handle nativo ni node id de PipeWire.", nameof(target));
+
+        await _frameCapture.AttachToTargetAsync(target, cancellationToken);
+    }
 
     // Obtenemos las regiones de interés activas para la ventana objetivo seleccionada por el usuario
     public async Task<IEnumerable<RegionOfInterest>> GetRegionOfInterestAsync(Frame frame, CancellationToken cancellationToken = default)
@@ -74,7 +94,7 @@ public class Coordinator : ICoordinator
     }
 
     // Inicia la ejecución la pipeline
-    public async Task StartCycle(IntPtr targetWindowHandle, IEnumerable<RegionOfInterestDto>? activeRoisDto = null)
+    public async Task StartCycle(IEnumerable<RegionOfInterestDto>? activeRoisDto = null)
     {
         EnsureInitialized();
 
@@ -85,7 +105,7 @@ public class Coordinator : ICoordinator
 
         this._isActive = true;
         this._overlaySession = true;
-        await _overlay.InitializeAsync(targetWindowHandle);
+        await _overlay.InitializeAsync();
 
         // Se ejecuta indefinidamente (hasta StopCycle) procesando un ciclo aprox. cada "interval" ms,
         // descontando el tiempo que el propio ProcessCycle tarda en correr.
