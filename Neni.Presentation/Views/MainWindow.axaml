@@ -7,16 +7,23 @@
         x:Class="Neni.Presentation.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="Neni.Presentation">
+        Title="Neni - VN Screen Translator">
 
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainViewModel />
-    </Design.DataContext>
+    <!-- Sin Design.DataContext: MainViewModel ahora exige un ICoordinator por constructor
+         (lo arma Composition/CoordinatorFactory en App.axaml.cs), así que no hay una instancia
+         trivial para el previewer del IDE. -->
 
-    <TextBox Text="{Binding Greeting}"
-             HorizontalAlignment="Center"
-             VerticalAlignment="Center" />
+    <StackPanel HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="12"
+                MinWidth="220">
+        <Button Content="Select Window"
+                Command="{Binding SelectWindowCommand}"
+                HorizontalAlignment="Stretch" />
+        <Button Content="Draw ROIs" HorizontalAlignment="Stretch" />
+        <TextBlock Text="{Binding StatusMessage}"
+                   TextWrapping="Wrap"
+                   HorizontalAlignment="Center" />
+    </StackPanel>
 
 </Window>

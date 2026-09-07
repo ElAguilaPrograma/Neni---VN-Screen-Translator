@@ -7,6 +7,7 @@ public interface ICoordinator
 {
 	Task<IEnumerable<CaptureTarget>> OpenWindowSelectorAsync(bool reuseLastSelection = false, CancellationToken cancellationToken = default);
 	Task AttachToTargetAsync(CaptureTarget target, CancellationToken cancellationToken = default);
+	Task<Frame> GrabPreviewFrameAsync(CancellationToken cancellationToken = default);
 	Task<IEnumerable<RegionOfInterest>> GetRegionOfInterestAsync(Frame frame, CancellationToken cancellationToken = default);
 	void DeleteRegionOfInterest(int roiId);
 	Task StartCycle(IEnumerable<RegionOfInterestDto>? activeRoisDto = null);

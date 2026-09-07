@@ -71,6 +71,12 @@ public class Coordinator : ICoordinator
         await _frameCapture.AttachToTargetAsync(target, cancellationToken);
     }
 
+    // Captura un único frame de la ventana ya vinculada, sin pasar por deduplicación/OCR.
+    // Sirve para verificar que la sesión de captura quedó operativa tras AttachToTargetAsync y,
+    // más adelante, como la fuente de imagen sobre la que el usuario dibuja las ROIs.
+    public async Task<Frame> GrabPreviewFrameAsync(CancellationToken cancellationToken = default)
+        => await _frameCapture.GrabFrameAsync(cancellationToken);
+
     // Obtenemos las regiones de interés activas para la ventana objetivo seleccionada por el usuario
     public async Task<IEnumerable<RegionOfInterest>> GetRegionOfInterestAsync(Frame frame, CancellationToken cancellationToken = default)
         => await _regionOfInterest.DrawRoisAsync(frame, cancellationToken);
