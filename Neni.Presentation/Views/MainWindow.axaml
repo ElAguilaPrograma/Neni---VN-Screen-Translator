@@ -20,7 +20,9 @@
         <Button Content="Select Window"
                 Command="{Binding SelectWindowCommand}"
                 HorizontalAlignment="Stretch" />
-        <Button Content="Draw ROIs" HorizontalAlignment="Stretch" />
+        <Button Content="Draw ROIs"
+                Command="{Binding DrawRoisCommand}"
+                HorizontalAlignment="Stretch" />
         <TextBlock Text="{Binding StatusMessage}"
                    TextWrapping="Wrap"
                    HorizontalAlignment="Center" />

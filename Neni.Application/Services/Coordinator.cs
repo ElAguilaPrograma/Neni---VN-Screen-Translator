@@ -110,8 +110,8 @@ public class Coordinator : ICoordinator
             throw new ArgumentOutOfRangeException(nameof(interval), "El intervalo de tiempo debe ser mayor a 0.");
 
         this._isActive = true;
-        this._overlaySession = true;
         await _overlay.InitializeAsync();
+        this._overlaySession = true;
 
         // Se ejecuta indefinidamente (hasta StopCycle) procesando un ciclo aprox. cada "interval" ms,
         // descontando el tiempo que el propio ProcessCycle tarda en correr.

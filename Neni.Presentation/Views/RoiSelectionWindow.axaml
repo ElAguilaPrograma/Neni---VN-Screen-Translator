@@ -1,0 +1,84 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Neni.Presentation.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="650"
+        x:Class="Neni.Presentation.Views.RoiSelectionWindow"
+        x:DataType="vm:RoiSelectionViewModel"
+        Width="1000" Height="650"
+        Title="Dibujar ROIs">
+
+    <Grid ColumnDefinitions="3*,260" Margin="12">
+
+        <!-- Preview en vivo + Canvas transparente encima para dibujar/mostrar las ROIs. -->
+        <Grid Grid.Column="0" Margin="0,0,12,0">
+            <Image Name="PreviewImage"
+                   Source="{Binding PreviewBitmap}"
+                   Stretch="Uniform" />
+            <Canvas Name="RoiOverlayCanvas"
+                    Background="Transparent"
+                    PointerPressed="RoiOverlayCanvas_PointerPressed"
+                    PointerMoved="RoiOverlayCanvas_PointerMoved"
+                    PointerReleased="RoiOverlayCanvas_PointerReleased" />
+        </Grid>
+
+        <!-- Panel lateral: lista de ROIs, contador, acciones. -->
+        <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto,Auto,Auto">
+
+            <StackPanel Grid.Row="0" Margin="0,0,0,8">
+                <TextBlock Text="{Binding CounterText}" FontWeight="Bold" />
+                <!-- Diagnóstico temporal: Pulls = intentos totales, Nuevos = cuántos de esos
+                     trajeron contenido realmente distinto al anterior. -->
+                <TextBlock Text="{Binding PullCount, StringFormat='Pulls: {0}'}"
+                           FontSize="11" Opacity="0.7" />
+                <TextBlock Text="{Binding NewFrameCount, StringFormat='Nuevos: {0}'}"
+                           FontSize="11" Opacity="0.7" />
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="1">
+                <ItemsControl Name="RoiListItemsControl" ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:RoiDraftItem">
+                            <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4"
+                                    Padding="8" Margin="0,0,0,8">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="{Binding RoiId, StringFormat='ROI #{0}'}"
+                                               FontWeight="Bold" />
+                                    <TextBlock>
+                                        <Run Text="{Binding W, StringFormat='{}{0:0}'}" />
+                                        <Run Text="x" />
+                                        <Run Text="{Binding H, StringFormat='{}{0:0}'}" />
+                                        <Run Text="px" />
+                                    </TextBlock>
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="Escala:" VerticalAlignment="Center" />
+                                        <NumericUpDown Value="{Binding Scale}"
+                                                       Minimum="0.5" Maximum="4" Increment="0.1"
+                                                       FormatString="0.0"
+                                                       Width="110" />
+                                    </StackPanel>
+                                    <Button Content="Eliminar"
+                                            HorizontalAlignment="Stretch"
+                                            Command="{Binding #RoiListItemsControl.((vm:RoiSelectionViewModel)DataContext).DeleteItemCommand}"
+                                            CommandParameter="{Binding}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <TextBlock Grid.Row="2" Text="{Binding StatusMessage}"
+                       Foreground="OrangeRed" TextWrapping="Wrap" Margin="0,8" />
+
+            <Button Grid.Row="3" Content="Limpiar todo"
+                    HorizontalAlignment="Stretch" Margin="0,0,0,8"
+                    Command="{Binding ClearAllCommand}" />
+
+            <Button Grid.Row="4" Content="Confirmar"
+                    HorizontalAlignment="Stretch"
+                    Click="ConfirmButton_Click" />
+        </Grid>
+    </Grid>
+</Window>

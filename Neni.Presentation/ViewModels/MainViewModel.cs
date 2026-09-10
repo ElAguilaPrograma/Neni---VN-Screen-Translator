@@ -40,4 +40,19 @@ public partial class MainViewModel : ViewModelBase
             StatusMessage = $"Error al seleccionar/adjuntar la ventana: {ex.Message}";
         }
     }
+
+    [RelayCommand]
+    private async Task DrawRoisAsync()
+    {
+        try
+        {
+            var frame = await _coordinator.GrabPreviewFrameAsync();
+            var rois = await _coordinator.GetRegionOfInterestAsync(frame);
+            StatusMessage = $"{rois.Count()} ROI(s) definidas.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error al dibujar ROIs: {ex.Message}";
+        }
+    }
 }
