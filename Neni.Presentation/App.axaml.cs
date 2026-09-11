@@ -26,6 +26,29 @@ public partial class App : Avalonia.Application
             {
                 DataContext = new MainViewModel(coordinator),
             };
+
+            // ShutdownRequested es síncrono: hay que cancelar el cierre, liberar y recién entonces
+            // cerrar de verdad, o el proceso puede morir a mitad del DisposeAsync.
+            var shuttingDown = false;
+
+            desktop.ShutdownRequested += async (_, e) =>
+            {
+                if (shuttingDown)
+                    return;
+
+                shuttingDown = true;
+                e.Cancel = true;
+
+                try
+                {
+                    await coordinator.DisposeAsync();
+                }
+                finally
+                {
+                    // En finally para que un fallo liberando no deje la app imposible de cerrar.
+                    desktop.Shutdown();
+                }
+            };
         }
 
         base.OnFrameworkInitializationCompleted();

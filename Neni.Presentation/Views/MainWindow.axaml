@@ -17,6 +17,10 @@
                 VerticalAlignment="Center"
                 Spacing="12"
                 MinWidth="220">
+        <Button Content="Load Models"
+                Command="{Binding InitializeCommand}"
+                IsEnabled="{Binding !IsInitialized}"
+                HorizontalAlignment="Stretch" />
         <Button Content="Select Window"
                 Command="{Binding SelectWindowCommand}"
                 HorizontalAlignment="Stretch" />

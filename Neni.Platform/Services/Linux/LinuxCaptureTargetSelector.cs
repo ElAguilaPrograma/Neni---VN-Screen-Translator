@@ -28,4 +28,10 @@ public sealed class LinuxCaptureTargetSelector : ICaptureTargetSelector
         bool reuseLastSelection = false,
         CancellationToken cancellationToken = default)
         => _portalSession.RequestTargetAsync(reuseLastSelection, cancellationToken);
+
+    /// <summary>
+    /// Cierra la sesion del portal. Se comparte con LinuxFrameCapture, pero el dueño es el selector
+    /// porque es quien la crea; el doble dispose es inofensivo.
+    /// </summary>
+    public ValueTask DisposeAsync() => _portalSession.DisposeAsync();
 }

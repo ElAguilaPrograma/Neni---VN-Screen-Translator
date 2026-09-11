@@ -3,7 +3,7 @@ using Neni.Abstractions.Enums;
 
 namespace Neni.Abstractions.Interfaces;
 
-public interface ICaptureTargetSelector
+public interface ICaptureTargetSelector : IAsyncDisposable
 {
     // Indica cual de los dos metodos de abajo tiene sentido en esta plataforma, para que la capa
     // de aplicacion no tenga que razonar sobre X11/Wayland/Windows por su cuenta.

@@ -34,9 +34,16 @@ public sealed class Initialize : IInitialize
         Translator = await _translatorEngineFactory.CreateAsync(cancellationToken);
     }
 
-    public async Task DisposeAsync()
+    /// <summary>
+    /// Libera el motor de OCR y el traductor. Tolera una inicializacion a medias: si la creacion
+    /// del motor fallo, Engine o Translator pueden no estar asignados.
+    /// </summary>
+    public async ValueTask DisposeAsync()
     {
-        await Engine.DisposeAsync();
-        await Translator.DisposeAsync();
+        if (Engine is not null)
+            await Engine.DisposeAsync();
+
+        if (Translator is not null)
+            await Translator.DisposeAsync();
     }
 }

@@ -9,7 +9,7 @@ namespace Neni.Application.Services;
 
 public class Coordinator : ICoordinator
 {
-    private readonly Initialize _initialize;
+    private readonly IInitialize _initialize;
     private readonly IDeduplication _deduplication;
     private readonly IRegionOfInterest _regionOfInterest;
     private readonly IOverlay _overlay;
@@ -19,6 +19,7 @@ public class Coordinator : ICoordinator
     private readonly Stopwatch stopwatch = new Stopwatch();
     private bool _isActive = false;
     private bool _overlaySession = false;
+    private bool _disposed = false;
     // Firma del ultimo frame DESPACHADO a OCR por ROI (no la del ciclo anterior): solo se escribe
     // cuando la deduplicacion deja pasar el frame. Ver la nota en IDeduplication.IsDuplicate.
     private Dictionary<int, FrameSignature> _lastSignatures = new Dictionary<int, FrameSignature>();
@@ -30,7 +31,7 @@ public class Coordinator : ICoordinator
     // items de overlay (uno por bloque de texto detectado por el OCR).
     private Dictionary<int, HashSet<int>> _activeOverlayItemIdsByRoi = new Dictionary<int, HashSet<int>>();
 
-    public Coordinator(Initialize initialize,
+    public Coordinator(IInitialize initialize,
         IDeduplication deduplication,
         IRegionOfInterest regionOfInterest,
         IOverlay overlay,
@@ -45,6 +46,18 @@ public class Coordinator : ICoordinator
         _frameProcessor = frameProcessor;
         _frameCapture = frameCapture;
         _targetSelector = targetSelector;
+    }
+
+    /// <summary>
+    /// Carga por unica vez lo pesado (settings, motor de OCR, traductor). Es idempotente:
+    /// re-inicializar dejaria sin liberar la sesion nativa del motor anterior.
+    /// </summary>
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        if (_initialize.AppSettings is not null)
+            return;
+
+        await _initialize.InitializeAsync(cancellationToken);
     }
 
     // Llama al selector de ventanas para que el usuario elija la ventana objetivo a traducir.
@@ -147,6 +160,24 @@ public class Coordinator : ICoordinator
         _lastProcessedRois = null;
         _lastSignatures.Clear();
         _translationTexts.Clear();
+    }
+
+    /// <summary>
+    /// Detiene el ciclo y suelta todo lo que la pipeline sostiene vivo. La captura se libera antes
+    /// que el selector porque la tuberia depende del nodo que vive en la sesion del portal.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+
+        await StopCycle();
+        await _initialize.DisposeAsync();
+        await _frameCapture.DisposeAsync();
+        await _overlay.DisposeAsync();
+        await _targetSelector.DisposeAsync();
     }
 
     // Ejecuta un ciclo de captura y procesamiento de frames, si la pipeline está activa y la sesión de overlay está activa.

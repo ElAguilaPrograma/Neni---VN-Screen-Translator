@@ -11,8 +11,28 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial string StatusMessage { get; set; } = "Ninguna ventana seleccionada.";
 
+    [ObservableProperty]
+    public partial bool IsInitialized { get; set; }
+
     public MainViewModel(ICoordinator coordinator)
         => _coordinator = coordinator;
+
+    /// <summary>Carga los modelos del pipeline y habilita el resto de la UI.</summary>
+    [RelayCommand]
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            StatusMessage = "Cargando modelos... la primera vez hay que descargarlos, puede tardar.";
+            await _coordinator.InitializeAsync();
+            IsInitialized = true;
+            StatusMessage = "Modelos cargados.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error al cargar los modelos: {ex.Message}";
+        }
+    }
 
     [RelayCommand]
     private async Task SelectWindowAsync()
