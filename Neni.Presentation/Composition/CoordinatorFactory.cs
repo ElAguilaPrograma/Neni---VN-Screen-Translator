@@ -14,9 +14,9 @@ namespace Neni.Presentation.Composition;
 // Cableado fijo a Linux por ahora (no hay todavía nada que elegir Windows-vs-Linux en runtime);
 // revisar esto cuando exista una implementación de Neni.Platform para Windows.
 //
-// IOverlay, IDeduplication e ITranslator todavía son placeholders temporales (ver sus propios
-// archivos) — no implementan nada real, solo permiten construir el Coordinator. De IFrameProcessor
-// solo CropFrame es real; ProcessFrame sigue pendiente y lanza NotImplementedException.
+// Piezas que todavía no hacen el trabajo real (ver sus propios archivos): IOverlay no dibuja nada,
+// y tanto ITranslator como IFrameProcessor.ProcessFrame devuelven su entrada intacta para poder
+// ejercitar el ciclo sin traducción ni preprocesado.
 // StartCycle/ProcessCycle fallarán o no harán nada útil hasta que se reemplacen; OpenWindowSelectorAsync,
 // AttachToTargetAsync y GrabPreviewFrameAsync (los únicos que Select Window usa) no los tocan.
 public static class CoordinatorFactory
@@ -29,12 +29,12 @@ public static class CoordinatorFactory
 
         var settings = new DefaultSettings();
         var ocrEngineFactory = new RapidOcrEngineFactory(settings);
-        var translatorEngineFactory = new NotImplementedTranslatorEngineFactory();
+        var translatorEngineFactory = new PassthroughTranslatorEngineFactory();
         var initialize = new Initialize(ocrEngineFactory, translatorEngineFactory, settings);
 
         var overlay = new NoOpOverlay();
         var frameProcessor = new FrameProcessor();
-        var deduplication = new NotImplementedDeduplication();
+        var deduplication = new Deduplication(settings);
         var regionOfInterest = new RegionOfInterest(settings);
 
         return new Coordinator(

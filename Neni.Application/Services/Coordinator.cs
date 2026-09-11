@@ -19,7 +19,9 @@ public class Coordinator : ICoordinator
     private readonly Stopwatch stopwatch = new Stopwatch();
     private bool _isActive = false;
     private bool _overlaySession = false;
-    private Dictionary<int, Frame> _lastFrames = new Dictionary<int, Frame>();
+    // Firma del ultimo frame DESPACHADO a OCR por ROI (no la del ciclo anterior): solo se escribe
+    // cuando la deduplicacion deja pasar el frame. Ver la nota en IDeduplication.IsDuplicate.
+    private Dictionary<int, FrameSignature> _lastSignatures = new Dictionary<int, FrameSignature>();
     private Frame? _lastWindowFrame;
     private List<RegionOfInterest>? _lastProcessedRois;
     private Dictionary<int, string> _translationTexts = new Dictionary<int, string>();
@@ -97,7 +99,7 @@ public class Coordinator : ICoordinator
             _activeOverlayItemIdsByRoi.Remove(roiId);
         }
 
-        _lastFrames.Remove(roiId);
+        _lastSignatures.Remove(roiId);
         _translationTexts.Remove(roiId);
     }
 
@@ -143,6 +145,8 @@ public class Coordinator : ICoordinator
         _regionOfInterest.ClearRois();
         _lastWindowFrame = null;
         _lastProcessedRois = null;
+        _lastSignatures.Clear();
+        _translationTexts.Clear();
     }
 
     // Ejecuta un ciclo de captura y procesamiento de frames, si la pipeline está activa y la sesión de overlay está activa.
@@ -316,15 +320,16 @@ public class Coordinator : ICoordinator
             }
 
             var processedFrame = _frameProcessor.ProcessFrame(croppedFrame);
+            var signature = _deduplication.ComputeSignature(processedFrame);
 
-            if(!forceRun && _deduplication.IsDuplicate(processedFrame, _lastFrames.GetValueOrDefault(roi.RoiId)))
+            if(!forceRun && _deduplication.IsDuplicate(signature, _lastSignatures.GetValueOrDefault(roi.RoiId)))
             {
                 Console.WriteLine($"Duplicate frame detected for ROI: {roi}. Skipping dispatch.");
                 return null;
             }
 
             var ocrResult = await _initialize.Engine.DetectAsync(processedFrame);
-            _lastFrames[roi.RoiId] = processedFrame;
+            _lastSignatures[roi.RoiId] = signature;
 
             return ocrResult;
         }

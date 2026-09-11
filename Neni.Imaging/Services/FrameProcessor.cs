@@ -39,10 +39,9 @@ public sealed class FrameProcessor : IFrameProcessor
     }
 
     // TODO pendiente: definir que preprocesado ayuda de verdad a la deteccion (binarizado, contraste,
-    // escala global de Settings.PreprocessScaleFactor). Hasta entonces falla explicito en vez de
-    // devolver el frame intacto y aparentar que hace algo.
-    public Frame ProcessFrame(Frame frame)
-        => throw new NotImplementedException();
+    // escala global de Settings.PreprocessScaleFactor). Hasta entonces devuelve el recorte intacto,
+    // igual que el stub de Ocr.NormalizeText.
+    public Frame ProcessFrame(Frame frame) => frame;
 
     private static int BytesPerPixelFor(PixelFormat format) => format switch
     {

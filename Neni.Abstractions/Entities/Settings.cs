@@ -12,9 +12,12 @@ public record Settings(
     int MaxPendingRois = 8,
     int TimerCycleInterval = 650,
     double PreprocessScaleFactor = 1.0,
+    // Fraccion minima de pixeles de borde que deben cambiar para considerar que la ROI cambio.
     double DeduplicationMinEdgeChangedRatio = 0.015,
-    double DeduplicationMaxSignatureSide = 120,
-    double DeduplicationQuanStep = 3,
+    // Lado maximo al que se reduce la ROI para calcular su firma.
+    int DeduplicationMaxSignatureSide = 120,
+    // Bits que se descartan del gris antes de comparar, para ignorar ruido de compresion/dithering.
+    int DeduplicationQuantStep = 3,
     bool CompanionWindowEnabled = false,
     double CompanionWindowOpacity = 0.8,
     Languages SourceLanguage = Languages.English,
