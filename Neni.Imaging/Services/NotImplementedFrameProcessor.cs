@@ -7,9 +7,9 @@ namespace Neni.Imaging.Services;
 // No se invoca todavía desde ningún flujo real (Select Window no recorta frames).
 public sealed class NotImplementedFrameProcessor : IFrameProcessor
 {
-    public Frame CropFrames(Frame frame, Abstractions.Entities.RegionOfInterest rois)
+    public Frame CropFrame(Frame frame, Abstractions.Entities.RegionOfInterest roi)
         => throw new NotImplementedException();
 
-    public Frame ProcessFrames(Frame frames)
+    public Frame ProcessFrame(Frame frame)
         => throw new NotImplementedException();
 }

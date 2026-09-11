@@ -20,6 +20,8 @@ public class Coordinator : ICoordinator
     private bool _isActive = false;
     private bool _overlaySession = false;
     private Dictionary<int, Frame> _lastFrames = new Dictionary<int, Frame>();
+    private Frame? _lastWindowFrame;
+    private List<RegionOfInterest>? _lastProcessedRois;
     private Dictionary<int, string> _translationTexts = new Dictionary<int, string>();
     private Dictionary<string, string> _translationCache = new Dictionary<string, string>();
     // Ids de overlay actualmente en pantalla, por RoiId. Un ROI puede generar varios
@@ -139,6 +141,8 @@ public class Coordinator : ICoordinator
         this._overlaySession = false;
         _activeOverlayItemIdsByRoi.Clear();
         _regionOfInterest.ClearRois();
+        _lastWindowFrame = null;
+        _lastProcessedRois = null;
     }
 
     // Ejecuta un ciclo de captura y procesamiento de frames, si la pipeline está activa y la sesión de overlay está activa.
@@ -164,6 +168,16 @@ public class Coordinator : ICoordinator
         }
 
         Frame windowFrame = await _frameCapture.GrabFrameAsync();
+
+        // Si la instancia del frame es la misma que la del ciclo anterior y las ROIs activas no cambiaron, 
+        // no hay nada que procesar: devolvemos el resultado del ciclo anterior.
+        if (ReferenceEquals(windowFrame, _lastWindowFrame)
+            && _lastProcessedRois is not null
+            && _lastProcessedRois.SequenceEqual(activeRois))
+            return _translationTexts;
+
+        _lastWindowFrame = windowFrame;
+        _lastProcessedRois = activeRois;
 
         foreach (var roi in activeRois)
         {
@@ -294,7 +308,7 @@ public class Coordinator : ICoordinator
 
         try
         {
-            var croppedFrame = _frameProcessor.CropFrames(windowFrame, roi);
+            var croppedFrame = _frameProcessor.CropFrame(windowFrame, roi);
 
             if (croppedFrame == null)
             {
@@ -302,7 +316,7 @@ public class Coordinator : ICoordinator
                 return null;
             }
 
-            var processedFrame = _frameProcessor.ProcessFrames(croppedFrame);
+            var processedFrame = _frameProcessor.ProcessFrame(croppedFrame);
 
             if(!forceRun && _deduplication.IsDuplicate(processedFrame, _lastFrames.GetValueOrDefault(roi.RoiId)))
             {
