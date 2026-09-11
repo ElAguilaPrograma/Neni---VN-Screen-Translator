@@ -6,21 +6,15 @@ using Neni.Presentation.Views;
 
 namespace Neni.Presentation.Services;
 
-// Implementación real de IRegionOfInterest (ver CLAUDE.md, "Implementation ownership decisions":
-// dibujar ventanas/rectángulos en pantalla es cosa de Avalonia, no de Neni.Imaging).
-//
-// Recibe el MISMO IFrameCapture singleton que usa Coordinator (cableado en CoordinatorFactory) y
-// lo usa para pedir frames en vivo mientras la ventana de dibujo está abierta. El parámetro Frame
-// de DrawRoisAsync solo sirve para pintar el primer cuadro antes de que arranque ese loop.
+// El parámetro Frame de DrawRoisAsync es el único frame que se muestra: un solo GrabFrameAsync
+// tomado antes de abrir la ventana, sin preview en vivo mientras el usuario dibuja.
 internal sealed class RegionOfInterest : IRegionOfInterest
 {
-    private readonly IFrameCapture _frameCapture;
     private readonly ISettings _settings;
     private readonly Dictionary<int, Abstractions.Entities.RegionOfInterest> _rois = new();
 
-    public RegionOfInterest(IFrameCapture frameCapture, ISettings settings)
+    public RegionOfInterest(ISettings settings)
     {
-        _frameCapture = frameCapture;
         _settings = settings;
     }
 
@@ -28,7 +22,7 @@ internal sealed class RegionOfInterest : IRegionOfInterest
         Frame frame, CancellationToken cancellationToken = default)
     {
         var maxRois = _settings.Load().MaxPendingRois;
-        var viewModel = new RoiSelectionViewModel(frame, _frameCapture, maxRois, _rois.Values);
+        var viewModel = new RoiSelectionViewModel(frame, maxRois, _rois.Values);
         var window = new RoiSelectionWindow { DataContext = viewModel };
 
         var owner = ResolveOwnerWindow();

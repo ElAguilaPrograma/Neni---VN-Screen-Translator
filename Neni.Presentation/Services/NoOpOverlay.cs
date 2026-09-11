@@ -6,9 +6,6 @@ namespace Neni.Presentation.Services;
 
 // Placeholder TEMPORAL: existe solo para que Coordinator pueda construirse por DI.
 // No se invoca todavía desde ningún flujo real (Select Window no arranca el ciclo de overlay).
-// Reemplazar por la implementación real en Avalonia (ver CLAUDE.md, "Implementation ownership
-// decisions": IOverlay vive en esta capa porque dibujar ventanas es algo que Avalonia resuelve
-// directamente).
 internal sealed class NoOpOverlay : IOverlay
 {
     public OverlayCapability CurrentOverlayCapability => OverlayCapability.CompanionWindowOnly;

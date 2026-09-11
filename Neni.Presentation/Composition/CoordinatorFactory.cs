@@ -34,7 +34,7 @@ public static class CoordinatorFactory
         var overlay = new NoOpOverlay();
         var frameProcessor = new NotImplementedFrameProcessor();
         var deduplication = new NotImplementedDeduplication();
-        var regionOfInterest = new RegionOfInterest(frameCapture, settings);
+        var regionOfInterest = new RegionOfInterest(settings);
 
         return new Coordinator(
             initialize,

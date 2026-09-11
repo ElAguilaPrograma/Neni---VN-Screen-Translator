@@ -26,15 +26,8 @@ public partial class RoiSelectionWindow : Window
                 viewModel.Items.CollectionChanged += (_, _) => RedrawConfirmedRois();
         };
 
-        // NO usar Canvas.LayoutUpdated acá: RedrawConfirmedRois muta RoiOverlayCanvas.Children,
-        // y eso por sí mismo dispara un nuevo pase de layout -> nuevo LayoutUpdated -> nueva
-        // mutación -> bucle infinito ("Infinite layout loop detected", reproducido apenas había
-        // al menos una ROI que dibujar). Resized/Opened solo se disparan por cambios reales de
-        // tamaño de ventana, no como efecto secundario de nuestro propio redibujado.
         Opened += (_, _) => RedrawConfirmedRois();
         Resized += (_, _) => RedrawConfirmedRois();
-
-        Closed += (_, _) => (DataContext as RoiSelectionViewModel)?.Dispose();
     }
 
     private void RoiOverlayCanvas_PointerPressed(object? sender, PointerPressedEventArgs e)
@@ -42,7 +35,6 @@ public partial class RoiSelectionWindow : Window
         if (DataContext is not RoiSelectionViewModel viewModel || !viewModel.CanAddRoi)
             return;
 
-        viewModel.BeginDrag();
         _dragStart = e.GetPosition(RoiOverlayCanvas);
         _dragVisual = new Rectangle
         {
@@ -83,7 +75,6 @@ public partial class RoiSelectionWindow : Window
         _dragStart = null;
         e.Pointer.Capture(null);
 
-        viewModel.EndDrag();
         viewModel.CommitDrag(start, end, RoiOverlayCanvas.Bounds.Size);
     }
 
@@ -93,8 +84,7 @@ public partial class RoiSelectionWindow : Window
         Close();
     }
 
-    // Redibuja los rectángulos de las ROIs ya confirmadas (no el rectángulo de arrastre en
-    // curso, que se maneja aparte en los handlers de puntero de arriba).
+    // Redibuja los rectángulos de las ROIs ya confirmadas.
     private void RedrawConfirmedRois()
     {
         if (DataContext is not RoiSelectionViewModel viewModel || _dragStart is not null)

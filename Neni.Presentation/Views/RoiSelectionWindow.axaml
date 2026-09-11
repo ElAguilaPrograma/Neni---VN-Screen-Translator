@@ -11,7 +11,7 @@
 
     <Grid ColumnDefinitions="3*,260" Margin="12">
 
-        <!-- Preview en vivo + Canvas transparente encima para dibujar/mostrar las ROIs. -->
+        <!-- Preview del frame capturado + Canvas transparente encima para dibujar/mostrar las ROIs. -->
         <Grid Grid.Column="0" Margin="0,0,12,0">
             <Image Name="PreviewImage"
                    Source="{Binding PreviewBitmap}"
@@ -28,12 +28,6 @@
 
             <StackPanel Grid.Row="0" Margin="0,0,0,8">
                 <TextBlock Text="{Binding CounterText}" FontWeight="Bold" />
-                <!-- Diagnóstico temporal: Pulls = intentos totales, Nuevos = cuántos de esos
-                     trajeron contenido realmente distinto al anterior. -->
-                <TextBlock Text="{Binding PullCount, StringFormat='Pulls: {0}'}"
-                           FontSize="11" Opacity="0.7" />
-                <TextBlock Text="{Binding NewFrameCount, StringFormat='Nuevos: {0}'}"
-                           FontSize="11" Opacity="0.7" />
             </StackPanel>
 
             <ScrollViewer Grid.Row="1">
