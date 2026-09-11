@@ -25,6 +25,8 @@ public class Coordinator : ICoordinator
     private Dictionary<int, FrameSignature> _lastSignatures = new Dictionary<int, FrameSignature>();
     private Frame? _lastWindowFrame;
     private List<RegionOfInterest>? _lastProcessedRois;
+    private CancellationTokenSource? _cycleCts;
+    private Task? _cycleTask;
     private Dictionary<int, string> _translationTexts = new Dictionary<int, string>();
     private Dictionary<string, string> _translationCache = new Dictionary<string, string>();
     // Ids de overlay actualmente en pantalla, por RoiId. Un ROI puede generar varios
@@ -116,8 +118,13 @@ public class Coordinator : ICoordinator
         _translationTexts.Remove(roiId);
     }
 
-    // Inicia la ejecución la pipeline
-    public async Task StartCycle(IEnumerable<RegionOfInterestDto>? activeRoisDto = null)
+    /// <summary>
+    /// Arranca la pipeline y la mantiene corriendo hasta StopCycle. No retorna mientras el ciclo
+    /// siga vivo. En cada vuelta reporta por progress el texto actual de cada ROI, indexado por RoiId.
+    /// </summary>
+    public async Task StartCycle(
+        IEnumerable<RegionOfInterestDto>? activeRoisDto = null,
+        IProgress<IReadOnlyDictionary<int, string>>? progress = null)
     {
         EnsureInitialized();
 
@@ -130,30 +137,79 @@ public class Coordinator : ICoordinator
         await _overlay.InitializeAsync();
         this._overlaySession = true;
 
-        // Se ejecuta indefinidamente (hasta StopCycle) procesando un ciclo aprox. cada "interval" ms,
-        // descontando el tiempo que el propio ProcessCycle tarda en correr.
+        _cycleCts = new CancellationTokenSource();
+
+        // Se guarda la tarea del bucle para que StopCycle pueda esperar a que termine de verdad.
+        _cycleTask = RunCycleAsync(activeRoisDto, progress, interval, _cycleCts.Token);
+
+        await _cycleTask;
+    }
+
+    /// <summary>
+    /// Bucle de la pipeline: procesa una vuelta, reporta el resultado y espera lo que reste del
+    /// intervalo, hasta que se cancele.
+    /// </summary>
+    private async Task RunCycleAsync(
+        IEnumerable<RegionOfInterestDto>? activeRoisDto,
+        IProgress<IReadOnlyDictionary<int, string>>? progress,
+        int interval,
+        CancellationToken cancellationToken)
+    {
         while (this._isActive)
         {
             stopwatch.Restart();
-            await this.ProcessCycle(activeRoisDto);
+
+            var texts = await this.ProcessCycle(activeRoisDto);
+
+            // Se reporta cada vuelta, cambie o no el texto: es el unico latido que tiene la UI para
+            // distinguir "pantalla estatica" de "el ciclo se congelo".
+            if (texts is not null)
+                progress?.Report(texts);
 
             var remaining = interval - stopwatch.ElapsedMilliseconds;
-            if (remaining > 0 && this._isActive)
-                await Task.Delay((int)remaining);
+
+            if (remaining <= 0)
+                continue;
+
+            try
+            {
+                await Task.Delay((int)remaining, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
         }
     }
-
-    // Detiene la ejecución de la pipeline
+    /// <summary>Detiene la pipeline, espera a que el ciclo termine y limpia el estado de la sesion.</summary>
     public async Task StopCycle()
     {
         if (!this._isActive)
             return;
 
-        stopwatch.Stop();
         this._isActive = false;
+        _cycleCts?.Cancel();
+
+        // Hay que esperar al bucle antes de soltar nada: si no, se puede liberar la captura con un
+        // GrabFrameAsync todavia en vuelo.
+        if (_cycleTask is not null)
+        {
+            try
+            {
+                await _cycleTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        _cycleCts?.Dispose();
+        _cycleCts = null;
+        _cycleTask = null;
+
+        stopwatch.Stop();
         this._overlaySession = false;
         await _overlay.StopAsync();
-        this._overlaySession = false;
         _activeOverlayItemIdsByRoi.Clear();
         _regionOfInterest.ClearRois();
         _lastWindowFrame = null;
@@ -173,17 +229,27 @@ public class Coordinator : ICoordinator
 
         _disposed = true;
 
-        await StopCycle();
+        // Un fallo del ciclo no puede impedir liberar: quien espera StartCycle ya lo observa.
+        try
+        {
+            await StopCycle();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deteniendo el ciclo durante el cierre: {ex.Message}");
+        }
+
         await _initialize.DisposeAsync();
         await _frameCapture.DisposeAsync();
         await _overlay.DisposeAsync();
         await _targetSelector.DisposeAsync();
     }
 
-    // Ejecuta un ciclo de captura y procesamiento de frames, si la pipeline está activa y la sesión de overlay está activa.
-    // Devuelve un diccionario con los textos traducidos para cada ROI procesada, 
-    // o null si no hay ROIs activas o si la pipeline no está activa.
-    public async Task<Dictionary<int, string>?> ProcessCycle(IEnumerable<RegionOfInterestDto>? activeRoisDto = null)
+    /// <summary>
+    /// Ejecuta una sola vuelta de la pipeline. Devuelve el texto de cada ROI indexado por RoiId,
+    /// o null si la pipeline no esta activa o no hay ROIs.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<int, string>?> ProcessCycle(IEnumerable<RegionOfInterestDto>? activeRoisDto = null)
     {
         EnsureInitialized();
 
@@ -192,7 +258,6 @@ public class Coordinator : ICoordinator
         if (!this._isActive || !this._overlaySession)
         {
             Console.WriteLine("Pipeline is not active or overlay session is not active.");
-            await this.StopCycle();
             return null;
         }
 
@@ -209,7 +274,7 @@ public class Coordinator : ICoordinator
         if (ReferenceEquals(windowFrame, _lastWindowFrame)
             && _lastProcessedRois is not null
             && _lastProcessedRois.SequenceEqual(activeRois))
-            return _translationTexts;
+            return Snapshot();
 
         _lastWindowFrame = windowFrame;
         _lastProcessedRois = activeRois;
@@ -293,8 +358,11 @@ public class Coordinator : ICoordinator
             _activeOverlayItemIdsByRoi[roi.RoiId] = currentOverlayItemIds;
             _translationTexts[roi.RoiId] = string.Join(Environment.NewLine, roiTranslatedLines);
         }
-        return _translationTexts;
+        return Snapshot();
     }
+
+    /// <summary>Copia el texto actual de cada ROI, para no exponer el diccionario mutable interno.</summary>
+    private IReadOnlyDictionary<int, string> Snapshot() => new Dictionary<int, string>(_translationTexts);
 
     // _initialize.AppSettings/Engine/Translator solo quedan listos después de InitializeAsync();
     // si alguien llama StartCycle/ProcessCycle antes de eso, fallamos con un mensaje claro en vez de un NRE opaco.

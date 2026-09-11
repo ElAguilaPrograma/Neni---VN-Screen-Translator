@@ -17,7 +17,20 @@ public interface ICoordinator : IAsyncDisposable
 	Task<Frame> GrabPreviewFrameAsync(CancellationToken cancellationToken = default);
 	Task<IEnumerable<RegionOfInterest>> GetRegionOfInterestAsync(Frame frame, CancellationToken cancellationToken = default);
 	void DeleteRegionOfInterest(int roiId);
-	Task StartCycle(IEnumerable<RegionOfInterestDto>? activeRoisDto = null);
+	/// <summary>
+	/// Arranca la pipeline y la mantiene corriendo hasta StopCycle. No retorna mientras el ciclo
+	/// siga vivo. En cada vuelta reporta por progress el texto actual de cada ROI, indexado por RoiId.
+	/// </summary>
+	Task StartCycle(
+		IEnumerable<RegionOfInterestDto>? activeRoisDto = null,
+		IProgress<IReadOnlyDictionary<int, string>>? progress = null);
+
+	/// <summary>Detiene la pipeline, espera a que el ciclo termine y limpia el estado de la sesion.</summary>
 	Task StopCycle();
-	Task<Dictionary<int, string>?> ProcessCycle(IEnumerable<RegionOfInterestDto>? activeRoisDto = null);
+
+	/// <summary>
+	/// Ejecuta una sola vuelta de la pipeline. Devuelve el texto de cada ROI indexado por RoiId,
+	/// o null si la pipeline no esta activa o no hay ROIs.
+	/// </summary>
+	Task<IReadOnlyDictionary<int, string>?> ProcessCycle(IEnumerable<RegionOfInterestDto>? activeRoisDto = null);
 }
