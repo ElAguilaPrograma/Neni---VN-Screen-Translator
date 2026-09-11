@@ -44,7 +44,7 @@ public partial class RoiSelectionViewModel : ViewModelBase
         _frameHeight = frame.Height;
 
         foreach (var roi in existingRois)
-            Items.Add(new RoiDraftItem(roi.RoiId, roi.X, roi.Y, roi.W, roi.H, (decimal)roi.Scale));
+            Items.Add(new RoiDraftItem(roi.RoiId, roi.X, roi.Y, roi.W, roi.H));
 
         _nextDraftId = Items.Count == 0 ? 1 : Items.Max(i => i.RoiId) + 1;
         Items.CollectionChanged += (_, _) => UpdateCounter();
@@ -78,7 +78,7 @@ public partial class RoiSelectionViewModel : ViewModelBase
         if (w < MinDragSizePx || h < MinDragSizePx)
             return;
 
-        Items.Add(new RoiDraftItem(_nextDraftId++, x, y, w, h, 1.0m));
+        Items.Add(new RoiDraftItem(_nextDraftId++, x, y, w, h));
         StatusMessage = null;
     }
 
@@ -101,7 +101,7 @@ public partial class RoiSelectionViewModel : ViewModelBase
     private void ClearAll() => Items.Clear();
 
     public void Confirm()
-        => ConfirmedRois = Items.Select(i => new RegionOfInterest(i.RoiId, i.X, i.Y, i.W, i.H, (double)i.Scale)).ToList();
+        => ConfirmedRois = Items.Select(i => new RegionOfInterest(i.RoiId, i.X, i.Y, i.W, i.H)).ToList();
 
     private Point ToFrameSpace(Point p, Size canvasSize)
     {

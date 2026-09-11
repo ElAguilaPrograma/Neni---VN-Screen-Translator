@@ -11,10 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Fijado a la misma versión que pide Avalonia.Skia 12.1.0 (ver su .nuspec): un pin más
-         alto aquí gana la resolución del paquete managed "SkiaSharp" pero no arrastra consigo
-         a SkiaSharp.NativeAssets.Linux, dejando una .so nativa vieja bajo un managed nuevo
-         (Avalonia.Skia falla en el arranque: "native libSkiaSharp library incompatible"). -->
     <PackageReference Include="SkiaSharp" Version="3.119.4" />
   </ItemGroup>
 

@@ -276,8 +276,7 @@ public class Coordinator : ICoordinator
             regionOfInterestDto.X,
             regionOfInterestDto.Y,
             regionOfInterestDto.W,
-            regionOfInterestDto.H,
-            regionOfInterestDto.Scale);
+            regionOfInterestDto.H);
 
     // Id determinístico y estable para el overlay de un bloque de texto dentro de una ROI, derivado
     // de RoiId y la posición del bloque (de arriba hacia abajo) en el resultado de OCR de este ciclo.
