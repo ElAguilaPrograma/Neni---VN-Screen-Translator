@@ -2,7 +2,6 @@ using Neni.Abstractions.Interfaces;
 using Neni.Abstractions.Entities;
 using Neni.Abstractions.Enums;
 using Neni.Application.Interfaces;
-using Neni.Application.DataTransferObjets;
 using System.Diagnostics;
 
 namespace Neni.Application.Services;
@@ -123,7 +122,7 @@ public class Coordinator : ICoordinator
     /// siga vivo. En cada vuelta reporta por progress el texto actual de cada ROI, indexado por RoiId.
     /// </summary>
     public async Task StartCycle(
-        IEnumerable<RegionOfInterestDto>? activeRoisDto = null,
+        IEnumerable<RegionOfInterest>? activeRois = null,
         IProgress<IReadOnlyDictionary<int, string>>? progress = null)
     {
         EnsureInitialized();
@@ -140,7 +139,7 @@ public class Coordinator : ICoordinator
         _cycleCts = new CancellationTokenSource();
 
         // Se guarda la tarea del bucle para que StopCycle pueda esperar a que termine de verdad.
-        _cycleTask = RunCycleAsync(activeRoisDto, progress, interval, _cycleCts.Token);
+        _cycleTask = RunCycleAsync(activeRois, progress, interval, _cycleCts.Token);
 
         await _cycleTask;
     }
@@ -150,7 +149,7 @@ public class Coordinator : ICoordinator
     /// intervalo, hasta que se cancele.
     /// </summary>
     private async Task RunCycleAsync(
-        IEnumerable<RegionOfInterestDto>? activeRoisDto,
+        IEnumerable<RegionOfInterest>? activeRois,
         IProgress<IReadOnlyDictionary<int, string>>? progress,
         int interval,
         CancellationToken cancellationToken)
@@ -159,7 +158,7 @@ public class Coordinator : ICoordinator
         {
             stopwatch.Restart();
 
-            var texts = await this.ProcessCycle(activeRoisDto);
+            var texts = await this.ProcessCycle(activeRois);
 
             // Se reporta cada vuelta, cambie o no el texto: es el unico latido que tiene la UI para
             // distinguir "pantalla estatica" de "el ciclo se congelo".
@@ -211,7 +210,6 @@ public class Coordinator : ICoordinator
         this._overlaySession = false;
         await _overlay.StopAsync();
         _activeOverlayItemIdsByRoi.Clear();
-        _regionOfInterest.ClearRois();
         _lastWindowFrame = null;
         _lastProcessedRois = null;
         _lastSignatures.Clear();
@@ -249,11 +247,11 @@ public class Coordinator : ICoordinator
     /// Ejecuta una sola vuelta de la pipeline. Devuelve el texto de cada ROI indexado por RoiId,
     /// o null si la pipeline no esta activa o no hay ROIs.
     /// </summary>
-    public async Task<IReadOnlyDictionary<int, string>?> ProcessCycle(IEnumerable<RegionOfInterestDto>? activeRoisDto = null)
+    public async Task<IReadOnlyDictionary<int, string>?> ProcessCycle(IEnumerable<RegionOfInterest>? activeRoisSource = null)
     {
         EnsureInitialized();
 
-        var activeRois = activeRoisDto?.Select(MapRegionOfInterestDtoToRegionOfInterest).ToList();
+        var activeRois = activeRoisSource?.ToList();
 
         if (!this._isActive || !this._overlaySession)
         {
@@ -371,15 +369,6 @@ public class Coordinator : ICoordinator
         if (_initialize.AppSettings is null)
             throw new InvalidOperationException("Initialize.InitializeAsync() debe ser invocado (y esperado) antes de iniciar el ciclo.");
     }
-
-    // Mover este mapper a una carpeta de Helpers o Utils, para que pueda ser reutilizado en otras partes del proyecto si es necesario.
-    private static RegionOfInterest MapRegionOfInterestDtoToRegionOfInterest(RegionOfInterestDto regionOfInterestDto)
-        => new(
-            regionOfInterestDto.RoiId,
-            regionOfInterestDto.X,
-            regionOfInterestDto.Y,
-            regionOfInterestDto.W,
-            regionOfInterestDto.H);
 
     // Id determinístico y estable para el overlay de un bloque de texto dentro de una ROI, derivado
     // de RoiId y la posición del bloque (de arriba hacia abajo) en el resultado de OCR de este ciclo.

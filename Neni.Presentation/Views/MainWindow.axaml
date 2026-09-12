@@ -19,7 +19,6 @@
                 MinWidth="220">
         <Button Content="Load Models"
                 Command="{Binding InitializeCommand}"
-                IsEnabled="{Binding !IsInitialized}"
                 HorizontalAlignment="Stretch" />
         <Button Content="Select Window"
                 Command="{Binding SelectWindowCommand}"
@@ -27,9 +26,27 @@
         <Button Content="Draw ROIs"
                 Command="{Binding DrawRoisCommand}"
                 HorizontalAlignment="Stretch" />
+        <Button Content="Start"
+                Command="{Binding StartCycleCommand}"
+                HorizontalAlignment="Stretch" />
+        <Button Content="Stop"
+                Command="{Binding StopCycleCommand}"
+                HorizontalAlignment="Stretch" />
         <TextBlock Text="{Binding StatusMessage}"
                    TextWrapping="Wrap"
                    HorizontalAlignment="Center" />
+        <TextBlock Text="{Binding CycleReports, StringFormat='Vueltas: {0}'}"
+                   FontSize="11" Opacity="0.7"
+                   HorizontalAlignment="Center" />
+
+        <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4"
+                Padding="8" MinHeight="120">
+            <ScrollViewer>
+                <TextBlock Text="{Binding DetectedText}"
+                           TextWrapping="Wrap"
+                           FontFamily="monospace" />
+            </ScrollViewer>
+        </Border>
     </StackPanel>
 
 </Window>
