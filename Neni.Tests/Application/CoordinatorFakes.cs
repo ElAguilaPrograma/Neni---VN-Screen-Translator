@@ -21,11 +21,10 @@ internal static class CoordinatorFakes
         return new Coordinator(
             settings,
             engines,
-            new TranslationCache(engines, settings),
+            new RoiProcessor(
+                new FakeFrameProcessor(), new FakeDeduplication(), engines, new TranslationCache(engines, settings), settings),
             new OverlayTracker(overlay),
-            new FakeDeduplication(),
             overlay,
-            new FakeFrameProcessor(),
             new FakeFrameCapture(),
             new FakeTargetSelector());
     }

@@ -11,18 +11,13 @@ internal sealed class Coordinator : ICoordinator
 {
     private readonly Settings _settings;
     private readonly IPipelineEngines _engines;
-    private readonly IDeduplication _deduplication;
     private readonly IOverlay _overlay;
     private readonly IFrameCapture _frameCapture;
-    private readonly IFrameProcessor _frameProcessor;
     private readonly ICaptureTargetSelector _targetSelector;
     private readonly Stopwatch stopwatch = new Stopwatch();
     private bool _isActive = false;
     private bool _overlaySession = false;
     private bool _disposed = false;
-    // Firma del ultimo frame DESPACHADO a OCR por ROI (no la del ciclo anterior): solo se escribe
-    // cuando la deduplicacion deja pasar el frame. Ver la nota en IDeduplication.IsDuplicate.
-    private Dictionary<int, FrameSignature> _lastSignatures = new Dictionary<int, FrameSignature>();
     // Unica fuente de verdad de las ROIs. Lista inmutable que se reemplaza entera: la UI la cambia
     // desde su hilo mientras el ciclo la lee desde el pool, y un swap de referencia es atomico.
     private IReadOnlyList<RegionOfInterest> _rois = [];
@@ -33,26 +28,22 @@ internal sealed class Coordinator : ICoordinator
     private CancellationTokenSource? _cycleCts;
     private Task? _cycleTask;
     private Dictionary<int, string> _translationTexts = new Dictionary<int, string>();
-    private readonly TranslationCache _translationCache;
+    private readonly RoiProcessor _roiProcessor;
     private readonly OverlayTracker _overlayTracker;
 
     public Coordinator(Settings settings,
         IPipelineEngines engines,
-        TranslationCache translationCache,
+        RoiProcessor roiProcessor,
         OverlayTracker overlayTracker,
-        IDeduplication deduplication,
         IOverlay overlay,
-        IFrameProcessor frameProcessor,
         IFrameCapture frameCapture,
         ICaptureTargetSelector targetSelector)
     {
         _settings = settings;
         _engines = engines;
-        _translationCache = translationCache;
+        _roiProcessor = roiProcessor;
         _overlayTracker = overlayTracker;
-        _deduplication = deduplication;
         _overlay = overlay;
-        _frameProcessor = frameProcessor;
         _frameCapture = frameCapture;
         _targetSelector = targetSelector;
     }
@@ -221,7 +212,7 @@ internal sealed class Coordinator : ICoordinator
         _overlayTracker.Reset();
         _lastWindowFrame = null;
         _lastProcessedRois = null;
-        _lastSignatures.Clear();
+        _roiProcessor.Reset();
         _translationTexts.Clear();
     }
 
@@ -285,29 +276,14 @@ internal sealed class Coordinator : ICoordinator
 
         foreach (var roi in activeRois)
         {
-            var ocrResult = await this.CaptureAndDispatch(roi, windowFrame);
-            if (ocrResult == null)
-            {
-                // Sin cambio de frame para esta ROI (o error): no tocamos su overlay existente.
+            var result = await _roiProcessor.ProcessAsync(roi, windowFrame);
+
+            // Unchanged o Failed: se conserva el texto y el overlay que ya tenia esta ROI.
+            if (result.Outcome != RoiOutcome.Updated)
                 continue;
-            }
 
-            var orderedBlocks = OrderBlocksReadingOrder(ocrResult.Blocks);
-            var translatedBlocks = new List<TranslatedBlock>();
-
-            for (var blockIndex = 0; blockIndex < orderedBlocks.Count; blockIndex++)
-            {
-                var block = orderedBlocks[blockIndex];
-                var ocrText = _engines.Ocr.NormalizeText(block.Text, _settings.SourceLanguage);
-                if (string.IsNullOrWhiteSpace(ocrText))
-                    continue;
-
-                var translatedText = await _translationCache.TranslateAsync(ocrText);
-                translatedBlocks.Add(new TranslatedBlock(blockIndex, ocrText, translatedText, block.BoxPoints));
-            }
-
-            await _overlayTracker.ApplyAsync(roi, translatedBlocks);
-            _translationTexts[roi.RoiId] = string.Join(Environment.NewLine, translatedBlocks.Select(b => b.TranslatedText));
+            await _overlayTracker.ApplyAsync(roi, result.Blocks);
+            _translationTexts[roi.RoiId] = string.Join(Environment.NewLine, result.Blocks.Select(b => b.TranslatedText));
         }
         return Snapshot();
     }
@@ -325,7 +301,7 @@ internal sealed class Coordinator : ICoordinator
         foreach (var staleRoi in _lastProcessedRois.Where(roi => !currentRois.Contains(roi)))
         {
             _overlayTracker.Forget(staleRoi.RoiId);
-            _lastSignatures.Remove(staleRoi.RoiId);
+            _roiProcessor.Forget(staleRoi.RoiId);
             _translationTexts.Remove(staleRoi.RoiId);
         }
     }
@@ -339,58 +315,5 @@ internal sealed class Coordinator : ICoordinator
     {
         if (!_engines.IsReady)
             throw new InvalidOperationException("InitializeAsync() debe ser invocado (y esperado) antes de iniciar el ciclo.");
-    }
-
-    // Ordena los bloques de texto de arriba hacia abajo para que el índice de cada bloque
-    // se mantenga estable entre ciclos y el overlay pueda reconocerlo.
-    private static IReadOnlyList<OcrTextBlock> OrderBlocksReadingOrder(IReadOnlyList<OcrTextBlock> blocks)
-        => blocks.OrderBy(b => b.BoxPoints[0].Y).ThenBy(b => b.BoxPoints[0].X).ToList();
-
-    // Captura el frame de la ventana objetivo, recorta la región de interés y la envía al motor OCR para su procesamiento.
-    // Devuelve null si no hubo cambio de frame para esta ROI (deduplicación) o si ocurrió un error.
-    private async Task<OcrResult?> CaptureAndDispatch(RegionOfInterest roi, Frame windowFrame, bool forceRun = false)
-    {
-        if (roi == null)
-        {
-            Console.WriteLine("No active ROIs provided. Skipping capture and dispatch.");
-            return null;
-        }
-
-        if (windowFrame == null)
-        {
-            Console.WriteLine("Failed to capture window frame. Skipping dispatch.");
-            return null;
-        }
-
-        try
-        {
-            var croppedFrame = _frameProcessor.CropFrame(windowFrame, roi);
-
-            if (croppedFrame == null)
-            {
-                Console.WriteLine($"Failed to crop frame for ROI: {roi}. Skipping this ROI.");
-                return null;
-            }
-
-            var processedFrame = _frameProcessor.ProcessFrame(croppedFrame);
-            var signature = _deduplication.ComputeSignature(processedFrame);
-
-            if(!forceRun && _deduplication.IsDuplicate(signature, _lastSignatures.GetValueOrDefault(roi.RoiId)))
-            {
-                Console.WriteLine($"Duplicate frame detected for ROI: {roi}. Skipping dispatch.");
-                return null;
-            }
-
-            var ocrResult = await _engines.Ocr.DetectAsync(processedFrame);
-            _lastSignatures[roi.RoiId] = signature;
-
-            return ocrResult;
-        }
-
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error during OCR processing: {ex.Message}");
-            return null;
-        }
     }
 }

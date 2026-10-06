@@ -19,6 +19,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton(sp => new TranslationCache(
             sp.GetRequiredService<IPipelineEngines>(), sp.GetRequiredService<Settings>()));
         services.AddSingleton<OverlayTracker>();
+        services.AddSingleton<RoiProcessor>();
         services.AddSingleton<ICoordinator, Coordinator>();
         return services;
     }
