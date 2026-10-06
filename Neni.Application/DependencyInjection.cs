@@ -13,7 +13,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<ISettings, DefaultSettings>();
         // Se carga una sola vez: todas las capas reciben la misma instancia en vez de leer por su cuenta.
         services.AddSingleton(sp => sp.GetRequiredService<ISettings>().Load());
-        services.AddSingleton<IInitialize, Initialize>();
+        services.AddSingleton<IPipelineEngines, PipelineEngines>();
         services.AddSingleton<ICoordinator, Coordinator>();
         return services;
     }

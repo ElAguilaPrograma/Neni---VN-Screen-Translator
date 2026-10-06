@@ -12,18 +12,18 @@ namespace Neni.Tests.Application;
 internal static class CoordinatorFakes
 {
     public static Coordinator CreateCoordinator() => new(
-        new FakeInitialize(),
+        new Settings(TimerCycleInterval: 10),
+        new FakePipelineEngines(),
         new FakeDeduplication(),
         new FakeOverlay(),
         new FakeFrameProcessor(),
         new FakeFrameCapture(),
         new FakeTargetSelector());
 
-    private sealed class FakeInitialize : IInitialize
+    private sealed class FakePipelineEngines : IPipelineEngines
     {
-        public bool IsInitialized => true;
-        public Settings AppSettings { get; } = new(TimerCycleInterval: 10);
-        public IOcr Engine { get; } = new FakeOcr();
+        public bool IsReady => true;
+        public IOcr Ocr { get; } = new FakeOcr();
         public ITranslator Translator { get; } = new FakeTranslator();
         public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;

@@ -8,7 +8,8 @@ namespace Neni.Application.Services;
 
 internal sealed class Coordinator : ICoordinator
 {
-    private readonly IInitialize _initialize;
+    private readonly Settings _settings;
+    private readonly IPipelineEngines _engines;
     private readonly IDeduplication _deduplication;
     private readonly IOverlay _overlay;
     private readonly IFrameCapture _frameCapture;
@@ -36,14 +37,16 @@ internal sealed class Coordinator : ICoordinator
     // items de overlay (uno por bloque de texto detectado por el OCR).
     private Dictionary<int, HashSet<int>> _activeOverlayItemIdsByRoi = new Dictionary<int, HashSet<int>>();
 
-    public Coordinator(IInitialize initialize,
+    public Coordinator(Settings settings,
+        IPipelineEngines engines,
         IDeduplication deduplication,
         IOverlay overlay,
         IFrameProcessor frameProcessor,
         IFrameCapture frameCapture,
         ICaptureTargetSelector targetSelector)
     {
-        _initialize = initialize;
+        _settings = settings;
+        _engines = engines;
         _deduplication = deduplication;
         _overlay = overlay;
         _frameProcessor = frameProcessor;
@@ -57,10 +60,10 @@ internal sealed class Coordinator : ICoordinator
     /// </summary>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        if (_initialize.IsInitialized)
+        if (_engines.IsReady)
             return;
 
-        await _initialize.InitializeAsync(cancellationToken);
+        await _engines.InitializeAsync(cancellationToken);
     }
 
     // Llama al selector de ventanas para que el usuario elija la ventana objetivo a traducir.
@@ -131,7 +134,7 @@ internal sealed class Coordinator : ICoordinator
     {
         EnsureInitialized();
 
-        var interval = _initialize.AppSettings.TimerCycleInterval;
+        var interval = _settings.TimerCycleInterval;
 
         if  (interval <= 0)
             throw new ArgumentOutOfRangeException(nameof(interval), "El intervalo de tiempo debe ser mayor a 0.");
@@ -296,16 +299,16 @@ internal sealed class Coordinator : ICoordinator
             for (var blockIndex = 0; blockIndex < orderedBlocks.Count; blockIndex++)
             {
                 var block = orderedBlocks[blockIndex];
-                var ocrText = _initialize.Engine.NormalizeText(block.Text, _initialize.AppSettings.SourceLanguage);
+                var ocrText = _engines.Ocr.NormalizeText(block.Text, _settings.SourceLanguage);
                 if (string.IsNullOrWhiteSpace(ocrText))
                     continue;
 
                 if (!_translationCache.TryGetValue(ocrText, out var translatedText))
                 {
-                    translatedText = await _initialize.Translator.TranslateAsync(
+                    translatedText = await _engines.Translator.TranslateAsync(
                         ocrText,
-                        _initialize.AppSettings.SourceLanguage,
-                        _initialize.AppSettings.TargetLanguage);
+                        _settings.SourceLanguage,
+                        _settings.TargetLanguage);
                     _translationCache[ocrText] = translatedText;
                 }
 
@@ -385,12 +388,12 @@ internal sealed class Coordinator : ICoordinator
     /// <summary>Copia el texto actual de cada ROI, para no exponer el diccionario mutable interno.</summary>
     private IReadOnlyDictionary<int, string> Snapshot() => new Dictionary<int, string>(_translationTexts);
 
-    // _initialize.Engine/Translator solo quedan listos después de InitializeAsync();
+    // Los motores solo quedan listos después de InitializeAsync();
     // si alguien llama StartCycle/ProcessCycle antes de eso, fallamos con un mensaje claro en vez de un NRE opaco.
     private void EnsureInitialized()
     {
-        if (!_initialize.IsInitialized)
-            throw new InvalidOperationException("Initialize.InitializeAsync() debe ser invocado (y esperado) antes de iniciar el ciclo.");
+        if (!_engines.IsReady)
+            throw new InvalidOperationException("InitializeAsync() debe ser invocado (y esperado) antes de iniciar el ciclo.");
     }
 
     // Id determinístico y estable para el overlay de un bloque de texto dentro de una ROI, derivado
@@ -439,7 +442,7 @@ internal sealed class Coordinator : ICoordinator
                 return null;
             }
 
-            var ocrResult = await _initialize.Engine.DetectAsync(processedFrame);
+            var ocrResult = await _engines.Ocr.DetectAsync(processedFrame);
             _lastSignatures[roi.RoiId] = signature;
 
             return ocrResult;
