@@ -5,7 +5,7 @@ namespace Neni.Ocr.Services;
 
 // Adaptador entre IOcrEngineFactory (Abstractions) y el factory estatico Ocr.CreateAsync.
 // Mantiene los tipos especificos de RapidOcr (modelManager, options) fuera de Application.
-public sealed class RapidOcrEngineFactory : IOcrEngineFactory
+internal sealed class RapidOcrEngineFactory : IOcrEngineFactory
 {
     private readonly ISettings _settings;
     private readonly RapidOcrModelManagerService _modelManager;

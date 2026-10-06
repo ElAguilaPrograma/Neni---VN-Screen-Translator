@@ -4,7 +4,7 @@ using Neni.Abstractions.Interfaces;
 
 namespace Neni.Imaging.Services;
 
-public sealed class Deduplication : IDeduplication
+internal sealed class Deduplication : IDeduplication
 {
     // No se exponen en Settings porque MinEdgeChangedRatio se
     // calibro justamente contra la densidad de bordes que produce Canny con estos dos valores.

@@ -17,4 +17,8 @@
     <PackageReference Include="Tmds.DBus" Version="0.94.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Neni.Tests" />
+  </ItemGroup>
+
 </Project>

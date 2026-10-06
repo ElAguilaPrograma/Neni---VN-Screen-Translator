@@ -4,7 +4,7 @@ using Neni.Abstractions.Interfaces;
 
 namespace Neni.Imaging.Services;
 
-public sealed class FrameProcessor : IFrameProcessor
+internal sealed class FrameProcessor : IFrameProcessor
 {
     public Frame CropFrame(Frame frame, RegionOfInterest roi)
     {

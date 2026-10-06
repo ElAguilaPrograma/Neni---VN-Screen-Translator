@@ -6,7 +6,7 @@ namespace Neni.Ocr.Services;
 
 // Sistema de escritura del texto reconocido (agrupa idiomas, no es 1:1 con ellos:
 // ES y EN comparten perfil Latin; JA y ZH comparten perfil Cjk).
-public enum Script
+internal enum Script
 {
     Latin,
     Cjk
@@ -18,7 +18,7 @@ public enum Script
 // son texto real. Ese criterio importa porque un filtro tipo [^\x00-\x7F] borraría
 // acentos/ñ del español y el 100% del texto japonés/chino.
 // Sin estado: seguro de llamar desde cualquier hilo del ciclo de captura.
-public static partial class TextNormalizer
+internal static partial class TextNormalizer
 {
     // Deriva el perfil desde el idioma configurado en Settings. Cualquier idioma no-CJK
     // cae al perfil Latin por defecto: es el fallback seguro, nunca destruye contenido.

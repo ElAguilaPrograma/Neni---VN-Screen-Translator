@@ -9,14 +9,14 @@ namespace Neni.Tests.Ocr;
 public class TextNormalizerTest
 {
     [Theory]
-    [InlineData(Languages.English, Script.Latin)]
-    [InlineData(Languages.Spanish, Script.Latin)]
-    [InlineData(Languages.Japanese, Script.Cjk)]
-    [InlineData(Languages.Chinese, Script.Cjk)]
-    [InlineData((Languages)99, Script.Latin)] // idioma desconocido -> fallback seguro
-    public void ScriptFor_mapea_idioma_a_sistema_de_escritura(Languages language, Script expected)
+    [InlineData(Languages.English, nameof(Script.Latin))]
+    [InlineData(Languages.Spanish, nameof(Script.Latin))]
+    [InlineData(Languages.Japanese, nameof(Script.Cjk))]
+    [InlineData(Languages.Chinese, nameof(Script.Cjk))]
+    [InlineData((Languages)99, nameof(Script.Latin))] // idioma desconocido -> fallback seguro
+    public void ScriptFor_mapea_idioma_a_sistema_de_escritura(Languages language, string expected)
     {
-        Assert.Equal(expected, TextNormalizer.ScriptFor(language));
+        Assert.Equal(expected, TextNormalizer.ScriptFor(language).ToString());
     }
 
     [Theory]

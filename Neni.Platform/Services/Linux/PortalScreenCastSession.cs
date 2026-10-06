@@ -12,7 +12,7 @@ namespace Neni.Platform.Services.Linux;
 // cierra la sesion y destruye el nodo de PipeWire. Por eso esta clase es de vida larga
 // (registrarla como singleton) y la comparten el selector de ventana y el IFrameCapture:
 // el node id que devuelve solo es valido mientras esta instancia siga viva.
-public sealed class PortalScreenCastSession : IAsyncDisposable
+internal sealed class PortalScreenCastSession : IAsyncDisposable
 {
     private const string PortalService = "org.freedesktop.portal.Desktop";
     private const string PortalObject = "/org/freedesktop/portal/desktop";

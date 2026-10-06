@@ -8,7 +8,7 @@ namespace Neni.Application.Services;
 // primero se deben inicializar las settings, luego los servicios que dependen de esas settings,
 // como el modelo de OCR, el modelo de traducción, etc. Se debe de hacer una sola vez al inicio de la aplicacion.
 
-public sealed class Initialize : IInitialize
+internal sealed class Initialize : IInitialize
 {
     private readonly ISettings _settings;
     private readonly IOcrEngineFactory _ocrEngineFactory;

@@ -6,7 +6,7 @@ namespace Neni.Application.Services;
 // Placeholder TEMPORAL: devuelve los valores por defecto de Settings sin tocar disco.
 // Reemplazar por la implementación real (leer/crear el JSON de configuración, según
 // documenta ISettings) cuando se implemente ISettings de verdad en esta capa.
-public sealed class DefaultSettings : ISettings
+internal sealed class DefaultSettings : ISettings
 {
     public Settings Load() => new();
 

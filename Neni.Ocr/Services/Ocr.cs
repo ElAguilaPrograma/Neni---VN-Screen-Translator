@@ -8,7 +8,7 @@ using SkiaSharp;
 
 namespace Neni.Ocr.Services;
 
-public sealed class Ocr : IOcr
+internal sealed class Ocr : IOcr
 {
     // TODO Instanciar el OCR al iniciar la aplicación.
     private readonly RapidOcrNet.RapidOcr _engine;

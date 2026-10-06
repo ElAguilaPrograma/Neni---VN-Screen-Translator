@@ -3,7 +3,7 @@ using Neni.Abstractions.Interfaces;
 
 namespace Neni.Application.Interfaces;
 
-public interface IInitialize : IAsyncDisposable
+internal interface IInitialize : IAsyncDisposable
 {
     Settings AppSettings { get; }
     IOcr Engine { get; }

@@ -24,4 +24,8 @@
       <ProjectReference Include="..\Neni.Abstractions\Neni.Abstractions.csproj" />
     </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Neni.Tests" />
+  </ItemGroup>
+
 </Project>

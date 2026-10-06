@@ -3,7 +3,7 @@ using Neni.Abstractions.Interfaces;
 
 namespace Neni.Ocr.Services;
 
-public sealed record RapidOcrModelPaths(
+internal sealed record RapidOcrModelPaths(
     string DetectionModelPath,
     string ClassificationModelPath,
     string RecognitionModelPath,
@@ -12,7 +12,7 @@ public sealed record RapidOcrModelPaths(
 // Gestiona los modelos de PP-OCRv6 (tiny/small/medium). PP-OCRv6 no publica un clasificador
 // de orientacion propio, asi que se reutiliza el clasificador de PP-OCRv5 como dependencia
 // compartida entre los 3 tamaños (ver README de RapidOcrNet).
-public sealed class RapidOcrModelManagerService
+internal sealed class RapidOcrModelManagerService
 {
     private const string ModelScopeBaseUrl = "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2";
 

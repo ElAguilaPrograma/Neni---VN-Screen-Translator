@@ -18,12 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Temporal: ya no se usan desde que el composition root vive en Neni.Desktop; se quitan
-         junto con el paso a internal de las implementaciones. -->
+    <!-- Solo Application: las implementaciones de las demas capas las cablea Neni.Desktop. -->
     <ProjectReference Include="../Neni.Application/Neni.Application.csproj" />
-    <ProjectReference Include="../Neni.Platform/Neni.Platform.csproj" />
-    <ProjectReference Include="../Neni.Ocr/Neni.Ocr.csproj" />
-    <ProjectReference Include="../Neni.Imaging/Neni.Imaging.csproj" />
-    <ProjectReference Include="../Neni.Translation/Neni.Translation.csproj" />
   </ItemGroup>
 </Project>

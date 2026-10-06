@@ -3,7 +3,7 @@ using Neni.Abstractions.Interfaces;
 
 namespace Neni.Platform.Services.Linux;
 
-public sealed class LinuxPlatformEnvironment : IPlatformEnvironment
+internal sealed class LinuxPlatformEnvironment : IPlatformEnvironment
 {
     // Compositores cuyo servidor implementa zwlr_layer_shell_v1, que es lo que nos permite
     // pintar un overlay por encima del juego. Mutter (GNOME) no lo implementa.

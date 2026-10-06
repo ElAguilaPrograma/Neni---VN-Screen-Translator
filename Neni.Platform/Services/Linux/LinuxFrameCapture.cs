@@ -13,7 +13,7 @@ namespace Neni.Platform.Services.Linux;
 //
 // Necesita la MISMA instancia de PortalScreenCastSession que uso el selector: el node id y el fd
 // solo son validos mientras esa sesion siga abierta (ver PortalScreenCastSession).
-public sealed class LinuxFrameCapture : IFrameCapture
+internal sealed class LinuxFrameCapture : IFrameCapture
 {
     private const string AppSinkName = "neni_sink";
     private const int BytesPerPixel = 4;

@@ -10,7 +10,7 @@ namespace Neni.Platform.Services.Linux;
 // sesiones y nos ahorra mantener un camino de P/Invoke a libX11 en paralelo. Enumerar ventanas
 // con XQueryTree/XGetWMName queda como posible camino secundario para X11 sin portal
 // (TODO: implementarlo solo si aparece un entorno X11 real sin xdg-desktop-portal instalado).
-public sealed class LinuxCaptureTargetSelector : ICaptureTargetSelector
+internal sealed class LinuxCaptureTargetSelector : ICaptureTargetSelector
 {
     private readonly PortalScreenCastSession _portalSession;
 

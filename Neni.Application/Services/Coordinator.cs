@@ -6,7 +6,7 @@ using System.Diagnostics;
 
 namespace Neni.Application.Services;
 
-public class Coordinator : ICoordinator
+internal sealed class Coordinator : ICoordinator
 {
     private readonly IInitialize _initialize;
     private readonly IDeduplication _deduplication;
