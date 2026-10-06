@@ -1,14 +1,14 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Neni.Abstractions.Entities;
 using Neni.Application.Interfaces;
+using Neni.Presentation.Services;
 
 namespace Neni.Presentation.ViewModels;
 
-public partial class MainViewModel : ViewModelBase
+internal partial class MainViewModel : ViewModelBase
 {
     private readonly ICoordinator _coordinator;
-    private IReadOnlyList<RegionOfInterest> _rois = [];
+    private readonly IRoiDrawingDialog _roiDrawingDialog;
 
     [ObservableProperty]
     public partial string StatusMessage { get; set; } = "Ninguna ventana seleccionada.";
@@ -37,18 +37,21 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(StartCycleCommand))]
     [NotifyCanExecuteChangedFor(nameof(StopCycleCommand))]
-    [NotifyCanExecuteChangedFor(nameof(DrawRoisCommand))]
     [NotifyCanExecuteChangedFor(nameof(SelectWindowCommand))]
     public partial bool IsCycleRunning { get; set; }
 
-    public MainViewModel(ICoordinator coordinator)
-        => _coordinator = coordinator;
+    public MainViewModel(ICoordinator coordinator, IRoiDrawingDialog roiDrawingDialog)
+    {
+        _coordinator = coordinator;
+        _roiDrawingDialog = roiDrawingDialog;
+    }
 
     private bool CanInitialize => !IsInitialized;
 
     private bool CanSelectWindow => !IsCycleRunning;
 
-    private bool CanDrawRois => HasTarget && !IsCycleRunning;
+    // Se puede redibujar con el ciclo corriendo: el Coordinator toma la lista nueva en la siguiente vuelta.
+    private bool CanDrawRois => HasTarget;
 
     private bool CanStartCycle => IsInitialized && HasTarget && HasRois && !IsCycleRunning;
 
@@ -100,16 +103,21 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Abre la ventana de dibujo y se queda con las ROIs que el usuario confirme.</summary>
+    /// <summary>Abre la ventana de dibujo y le entrega al Coordinator las ROIs que el usuario confirme.</summary>
     [RelayCommand(CanExecute = nameof(CanDrawRois))]
     private async Task DrawRoisAsync()
     {
         try
         {
             var frame = await _coordinator.GrabPreviewFrameAsync();
-            _rois = (await _coordinator.GetRegionOfInterestAsync(frame)).ToList();
-            HasRois = _rois.Count > 0;
-            StatusMessage = $"{_rois.Count} ROI(s) definidas.";
+            var confirmed = await _roiDrawingDialog.ShowAsync(frame, _coordinator.RegionsOfInterest);
+
+            if (confirmed is null)
+                return;
+
+            _coordinator.SetRegionsOfInterest(confirmed);
+            HasRois = confirmed.Count > 0;
+            StatusMessage = $"{confirmed.Count} ROI(s) definidas.";
         }
         catch (Exception ex)
         {
@@ -159,7 +167,7 @@ public partial class MainViewModel : ViewModelBase
         {
             // Task.Run es lo que mantiene el ciclo fuera del hilo de UI: sin el, cada await del
             // bucle volveria a ese hilo y el recorte, la deduplicacion y la espera lo bloquearian.
-            await Task.Run(() => _coordinator.StartCycle(_rois, progress));
+            await Task.Run(() => _coordinator.StartCycle(progress));
         }
         catch (Exception ex)
         {

@@ -1,28 +1,27 @@
 using Avalonia.Controls.ApplicationLifetimes;
 using Neni.Abstractions.Entities;
-using Neni.Abstractions.Interfaces;
 using Neni.Presentation.ViewModels;
 using Neni.Presentation.Views;
 
 namespace Neni.Presentation.Services;
 
-// El parámetro Frame de DrawRoisAsync es el único frame que se muestra: un solo GrabFrameAsync
-// tomado antes de abrir la ventana, sin preview en vivo mientras el usuario dibuja.
-internal sealed class RegionOfInterest : IRegionOfInterest
+// El frame es el único que se muestra: un solo GrabFrameAsync tomado antes de abrir la ventana,
+// sin preview en vivo mientras el usuario dibuja. No guarda ROIs: el dueño es el ICoordinator.
+internal sealed class RoiDrawingDialog : IRoiDrawingDialog
 {
     private readonly Settings _settings;
-    private readonly Dictionary<int, Abstractions.Entities.RegionOfInterest> _rois = new();
 
-    public RegionOfInterest(Settings settings)
+    public RoiDrawingDialog(Settings settings)
     {
         _settings = settings;
     }
 
-    public async Task<IEnumerable<Abstractions.Entities.RegionOfInterest>> DrawRoisAsync(
-        Frame frame, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<RegionOfInterest>?> ShowAsync(
+        Frame frame,
+        IReadOnlyList<RegionOfInterest> currentRois,
+        CancellationToken cancellationToken = default)
     {
-        var maxRois = _settings.MaxPendingRois;
-        var viewModel = new RoiSelectionViewModel(frame, maxRois, _rois.Values);
+        var viewModel = new RoiSelectionViewModel(frame, _settings.MaxPendingRois, currentRois);
         var window = new RoiSelectionWindow { DataContext = viewModel };
 
         var owner = ResolveOwnerWindow();
@@ -31,21 +30,9 @@ internal sealed class RegionOfInterest : IRegionOfInterest
         else
             await ShowAndWaitForCloseAsync(window);
 
-        // ConfirmedRois queda null si se cerró con la X sin tocar "Confirmar": se conserva el
-        // estado previo en vez de perder lo que ya estaba definido.
-        if (viewModel.ConfirmedRois is not { } confirmed)
-            return _rois.Values;
-
-        _rois.Clear();
-        foreach (var roi in confirmed)
-            _rois[roi.RoiId] = roi;
-
-        return _rois.Values;
+        // null si se cerró con la X sin tocar "Confirmar": quien llama conserva lo que ya tenía.
+        return viewModel.ConfirmedRois;
     }
-
-    public void DeleteRoi(int roiId) => _rois.Remove(roiId);
-
-    public void ClearRois() => _rois.Clear();
 
     // Sin owner (p. ej. arrancando fuera del ciclo de vida clásico de escritorio) igual mostramos
     // la ventana, solo que no queda anclada ni bloquea a MainWindow.

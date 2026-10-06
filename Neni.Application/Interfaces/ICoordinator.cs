@@ -14,22 +14,30 @@ public interface ICoordinator : IAsyncDisposable
 	Task<IEnumerable<CaptureTarget>> OpenWindowSelectorAsync(bool reuseLastSelection = false, CancellationToken cancellationToken = default);
 	Task AttachToTargetAsync(CaptureTarget target, CancellationToken cancellationToken = default);
 	Task<Frame> GrabPreviewFrameAsync(CancellationToken cancellationToken = default);
-	Task<IEnumerable<RegionOfInterest>> GetRegionOfInterestAsync(Frame frame, CancellationToken cancellationToken = default);
-	void DeleteRegionOfInterest(int roiId);
+
+	/// <summary>ROIs actuales. Application es su unica duena: la UI las dibuja y se las entrega aqui.</summary>
+	IReadOnlyList<RegionOfInterest> RegionsOfInterest { get; }
 	/// <summary>
-	/// Arranca la pipeline y la mantiene corriendo hasta StopCycle. No retorna mientras el ciclo
-	/// siga vivo. En cada vuelta reporta por progress el texto actual de cada ROI, indexado por RoiId.
+	/// Reemplaza las ROIs (los RoiId deben ser unicos). Valido con el ciclo corriendo: la siguiente
+	/// vuelta usa la lista nueva.
 	/// </summary>
-	Task StartCycle(
-		IEnumerable<RegionOfInterest>? activeRois = null,
-		IProgress<IReadOnlyDictionary<int, string>>? progress = null);
+	void SetRegionsOfInterest(IEnumerable<RegionOfInterest> rois);
+	/// <summary>Quita una ROI junto con su texto y su overlay.</summary>
+	void DeleteRegionOfInterest(int roiId);
+
+	/// <summary>
+	/// Arranca la pipeline sobre las ROIs actuales y la mantiene corriendo hasta StopCycle. No retorna
+	/// mientras el ciclo siga vivo. En cada vuelta reporta por progress el texto actual de cada ROI,
+	/// indexado por RoiId.
+	/// </summary>
+	Task StartCycle(IProgress<IReadOnlyDictionary<int, string>>? progress = null);
 
 	/// <summary>Detiene la pipeline, espera a que el ciclo termine y limpia el estado de la sesion.</summary>
 	Task StopCycle();
 
 	/// <summary>
-	/// Ejecuta una sola vuelta de la pipeline. Devuelve el texto de cada ROI indexado por RoiId,
-	/// o null si la pipeline no esta activa o no hay ROIs.
+	/// Ejecuta una sola vuelta de la pipeline sobre las ROIs actuales. Devuelve el texto de cada ROI
+	/// indexado por RoiId (vacio si no hay ROIs), o null si la pipeline no esta activa.
 	/// </summary>
-	Task<IReadOnlyDictionary<int, string>?> ProcessCycle(IEnumerable<RegionOfInterest>? activeRois = null);
+	Task<IReadOnlyDictionary<int, string>?> ProcessCycle();
 }

@@ -10,7 +10,6 @@ internal sealed class Coordinator : ICoordinator
 {
     private readonly IInitialize _initialize;
     private readonly IDeduplication _deduplication;
-    private readonly IRegionOfInterest _regionOfInterest;
     private readonly IOverlay _overlay;
     private readonly IFrameCapture _frameCapture;
     private readonly IFrameProcessor _frameProcessor;
@@ -22,8 +21,13 @@ internal sealed class Coordinator : ICoordinator
     // Firma del ultimo frame DESPACHADO a OCR por ROI (no la del ciclo anterior): solo se escribe
     // cuando la deduplicacion deja pasar el frame. Ver la nota en IDeduplication.IsDuplicate.
     private Dictionary<int, FrameSignature> _lastSignatures = new Dictionary<int, FrameSignature>();
+    // Unica fuente de verdad de las ROIs. Lista inmutable que se reemplaza entera: la UI la cambia
+    // desde su hilo mientras el ciclo la lee desde el pool, y un swap de referencia es atomico.
+    private IReadOnlyList<RegionOfInterest> _rois = [];
+    private readonly Lock _roisGate = new();
     private Frame? _lastWindowFrame;
-    private List<RegionOfInterest>? _lastProcessedRois;
+    // ROIs que proceso la vuelta anterior: detecta cambios para purgar el estado que dejaron.
+    private IReadOnlyList<RegionOfInterest>? _lastProcessedRois;
     private CancellationTokenSource? _cycleCts;
     private Task? _cycleTask;
     private Dictionary<int, string> _translationTexts = new Dictionary<int, string>();
@@ -34,7 +38,6 @@ internal sealed class Coordinator : ICoordinator
 
     public Coordinator(IInitialize initialize,
         IDeduplication deduplication,
-        IRegionOfInterest regionOfInterest,
         IOverlay overlay,
         IFrameProcessor frameProcessor,
         IFrameCapture frameCapture,
@@ -42,7 +45,6 @@ internal sealed class Coordinator : ICoordinator
     {
         _initialize = initialize;
         _deduplication = deduplication;
-        _regionOfInterest = regionOfInterest;
         _overlay = overlay;
         _frameProcessor = frameProcessor;
         _frameCapture = frameCapture;
@@ -95,35 +97,37 @@ internal sealed class Coordinator : ICoordinator
     public async Task<Frame> GrabPreviewFrameAsync(CancellationToken cancellationToken = default)
         => await _frameCapture.GrabFrameAsync(cancellationToken);
 
-    // Obtenemos las regiones de interés activas para la ventana objetivo seleccionada por el usuario
-    public async Task<IEnumerable<RegionOfInterest>> GetRegionOfInterestAsync(Frame frame, CancellationToken cancellationToken = default)
-        => await _regionOfInterest.DrawRoisAsync(frame, cancellationToken);
+    public IReadOnlyList<RegionOfInterest> RegionsOfInterest => Volatile.Read(ref _rois);
 
-    // Eliminamos una región de interés específica identificada por su ID, junto con su overlay
-    // y el estado en caché (último frame, última traducción) que quedó asociado a esa ROI.
+    /// <summary>
+    /// Reemplaza las ROIs. Se puede llamar con el ciclo corriendo: la siguiente vuelta toma la lista
+    /// nueva y purga el estado (firma, texto, overlay) de las ROIs que desaparecieron o cambiaron.
+    /// </summary>
+    public void SetRegionsOfInterest(IEnumerable<RegionOfInterest> rois)
+    {
+        ArgumentNullException.ThrowIfNull(rois);
+
+        var snapshot = rois.ToArray();
+
+        if (snapshot.Select(roi => roi.RoiId).Distinct().Count() != snapshot.Length)
+            throw new ArgumentException("Hay ROIs con el RoiId repetido.", nameof(rois));
+
+        lock (_roisGate)
+            Volatile.Write(ref _rois, snapshot);
+    }
+
+    /// <summary>Quita una ROI; su estado en cache se purga en la siguiente vuelta del ciclo.</summary>
     public void DeleteRegionOfInterest(int roiId)
     {
-        _regionOfInterest.DeleteRoi(roiId);
-
-        if (_activeOverlayItemIdsByRoi.TryGetValue(roiId, out var overlayItemIds))
-        {
-            foreach (var overlayItemId in overlayItemIds)
-                _overlay.RemoveOverlayContent(overlayItemId);
-
-            _activeOverlayItemIdsByRoi.Remove(roiId);
-        }
-
-        _lastSignatures.Remove(roiId);
-        _translationTexts.Remove(roiId);
+        lock (_roisGate)
+            Volatile.Write(ref _rois, _rois.Where(roi => roi.RoiId != roiId).ToArray());
     }
 
     /// <summary>
     /// Arranca la pipeline y la mantiene corriendo hasta StopCycle. No retorna mientras el ciclo
     /// siga vivo. En cada vuelta reporta por progress el texto actual de cada ROI, indexado por RoiId.
     /// </summary>
-    public async Task StartCycle(
-        IEnumerable<RegionOfInterest>? activeRois = null,
-        IProgress<IReadOnlyDictionary<int, string>>? progress = null)
+    public async Task StartCycle(IProgress<IReadOnlyDictionary<int, string>>? progress = null)
     {
         EnsureInitialized();
 
@@ -139,7 +143,7 @@ internal sealed class Coordinator : ICoordinator
         _cycleCts = new CancellationTokenSource();
 
         // Se guarda la tarea del bucle para que StopCycle pueda esperar a que termine de verdad.
-        _cycleTask = RunCycleAsync(activeRois, progress, interval, _cycleCts.Token);
+        _cycleTask = RunCycleAsync(progress, interval, _cycleCts.Token);
 
         await _cycleTask;
     }
@@ -149,7 +153,6 @@ internal sealed class Coordinator : ICoordinator
     /// intervalo, hasta que se cancele.
     /// </summary>
     private async Task RunCycleAsync(
-        IEnumerable<RegionOfInterest>? activeRois,
         IProgress<IReadOnlyDictionary<int, string>>? progress,
         int interval,
         CancellationToken cancellationToken)
@@ -158,7 +161,7 @@ internal sealed class Coordinator : ICoordinator
         {
             stopwatch.Restart();
 
-            var texts = await this.ProcessCycle(activeRois);
+            var texts = await this.ProcessCycle();
 
             // Se reporta cada vuelta, cambie o no el texto: es el unico latido que tiene la UI para
             // distinguir "pantalla estatica" de "el ciclo se congelo".
@@ -239,14 +242,12 @@ internal sealed class Coordinator : ICoordinator
     }
 
     /// <summary>
-    /// Ejecuta una sola vuelta de la pipeline. Devuelve el texto de cada ROI indexado por RoiId,
-    /// o null si la pipeline no esta activa o no hay ROIs.
+    /// Ejecuta una sola vuelta de la pipeline sobre las ROIs actuales. Devuelve el texto de cada ROI
+    /// indexado por RoiId (vacio si no hay ROIs), o null si la pipeline no esta activa.
     /// </summary>
-    public async Task<IReadOnlyDictionary<int, string>?> ProcessCycle(IEnumerable<RegionOfInterest>? activeRoisSource = null)
+    public async Task<IReadOnlyDictionary<int, string>?> ProcessCycle()
     {
         EnsureInitialized();
-
-        var activeRois = activeRoisSource?.ToList();
 
         if (!this._isActive || !this._overlaySession)
         {
@@ -254,23 +255,27 @@ internal sealed class Coordinator : ICoordinator
             return null;
         }
 
-        if (activeRois == null || activeRois.Count == 0)
+        // Se lee una sola vez: toda la vuelta trabaja sobre la misma lista aunque la UI la cambie.
+        var activeRois = RegionsOfInterest;
+        var roisChanged = _lastProcessedRois is null || !_lastProcessedRois.SequenceEqual(activeRois);
+
+        if (roisChanged)
         {
-            Console.WriteLine("No active ROIs provided. Skipping cycle processing.");
-            return null;
+            PurgeStaleRoiState(activeRois);
+            _lastProcessedRois = activeRois;
         }
+
+        if (activeRois.Count == 0)
+            return Snapshot();
 
         Frame windowFrame = await _frameCapture.GrabFrameAsync();
 
-        // Si la instancia del frame es la misma que la del ciclo anterior y las ROIs activas no cambiaron, 
+        // Si la instancia del frame es la misma que la del ciclo anterior y las ROIs activas no cambiaron,
         // no hay nada que procesar: devolvemos el resultado del ciclo anterior.
-        if (ReferenceEquals(windowFrame, _lastWindowFrame)
-            && _lastProcessedRois is not null
-            && _lastProcessedRois.SequenceEqual(activeRois))
+        if (!roisChanged && ReferenceEquals(windowFrame, _lastWindowFrame))
             return Snapshot();
 
         _lastWindowFrame = windowFrame;
-        _lastProcessedRois = activeRois;
 
         foreach (var roi in activeRois)
         {
@@ -352,6 +357,29 @@ internal sealed class Coordinator : ICoordinator
             _translationTexts[roi.RoiId] = string.Join(Environment.NewLine, roiTranslatedLines);
         }
         return Snapshot();
+    }
+
+    /// <summary>
+    /// Suelta el estado de cada ROI de la vuelta anterior que ya no esta, o que cambio de geometria
+    /// (mismo id, otro rectangulo: su firma y su texto ya no corresponden). Corre en el hilo del ciclo,
+    /// el unico que toca estos diccionarios.
+    /// </summary>
+    private void PurgeStaleRoiState(IReadOnlyList<RegionOfInterest> currentRois)
+    {
+        if (_lastProcessedRois is null)
+            return;
+
+        foreach (var staleRoi in _lastProcessedRois.Where(roi => !currentRois.Contains(roi)))
+        {
+            if (_activeOverlayItemIdsByRoi.Remove(staleRoi.RoiId, out var overlayItemIds))
+            {
+                foreach (var overlayItemId in overlayItemIds)
+                    _overlay.RemoveOverlayContent(overlayItemId);
+            }
+
+            _lastSignatures.Remove(staleRoi.RoiId);
+            _translationTexts.Remove(staleRoi.RoiId);
+        }
     }
 
     /// <summary>Copia el texto actual de cada ROI, para no exponer el diccionario mutable interno.</summary>

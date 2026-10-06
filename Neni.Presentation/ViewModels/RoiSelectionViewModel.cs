@@ -33,7 +33,7 @@ public partial class RoiSelectionViewModel : ViewModelBase
 
     public ObservableCollection<RoiDraftItem> Items { get; } = new();
 
-    // null hasta que se presiona "Confirmar" — RegionOfInterest (el servicio) lo lee después de
+    // null hasta que se presiona "Confirmar" — RoiDrawingDialog lo lee después de
     // que la ventana cierra para distinguir "confirmó" de "cerró con la X sin confirmar".
     public IReadOnlyList<RegionOfInterest>? ConfirmedRois { get; private set; }
 
