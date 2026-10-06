@@ -12,19 +12,6 @@ sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        // Diagnóstico temporal para aislar el bug del preview estático, ver DiagCapture.cs.
-        if (args.Contains("--diag-capture-holdonly"))
-        {
-            DiagCapture.RunHoldOnlyAsync().GetAwaiter().GetResult();
-            return;
-        }
-
-        if (args.Contains("--diag-capture"))
-        {
-            DiagCapture.RunAsync().GetAwaiter().GetResult();
-            return;
-        }
-
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

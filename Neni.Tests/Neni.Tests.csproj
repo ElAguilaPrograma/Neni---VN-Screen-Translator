@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Neni.Ocr\Neni.Ocr.csproj" />
     <ProjectReference Include="..\Neni.Abstractions\Neni.Abstractions.csproj" />
+    <ProjectReference Include="..\Neni.Platform\Neni.Platform.csproj" />
   </ItemGroup>
 
   <ItemGroup>
