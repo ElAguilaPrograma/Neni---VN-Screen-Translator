@@ -2,6 +2,7 @@ using Neni.Abstractions.Interfaces;
 using Neni.Abstractions.Entities;
 using Neni.Abstractions.Enums;
 using Neni.Application.Interfaces;
+using Neni.Application.Pipeline;
 using System.Diagnostics;
 
 namespace Neni.Application.Services;
@@ -32,13 +33,14 @@ internal sealed class Coordinator : ICoordinator
     private CancellationTokenSource? _cycleCts;
     private Task? _cycleTask;
     private Dictionary<int, string> _translationTexts = new Dictionary<int, string>();
-    private Dictionary<string, string> _translationCache = new Dictionary<string, string>();
+    private readonly TranslationCache _translationCache;
     // Ids de overlay actualmente en pantalla, por RoiId. Un ROI puede generar varios
     // items de overlay (uno por bloque de texto detectado por el OCR).
     private Dictionary<int, HashSet<int>> _activeOverlayItemIdsByRoi = new Dictionary<int, HashSet<int>>();
 
     public Coordinator(Settings settings,
         IPipelineEngines engines,
+        TranslationCache translationCache,
         IDeduplication deduplication,
         IOverlay overlay,
         IFrameProcessor frameProcessor,
@@ -47,6 +49,7 @@ internal sealed class Coordinator : ICoordinator
     {
         _settings = settings;
         _engines = engines;
+        _translationCache = translationCache;
         _deduplication = deduplication;
         _overlay = overlay;
         _frameProcessor = frameProcessor;
@@ -303,14 +306,7 @@ internal sealed class Coordinator : ICoordinator
                 if (string.IsNullOrWhiteSpace(ocrText))
                     continue;
 
-                if (!_translationCache.TryGetValue(ocrText, out var translatedText))
-                {
-                    translatedText = await _engines.Translator.TranslateAsync(
-                        ocrText,
-                        _settings.SourceLanguage,
-                        _settings.TargetLanguage);
-                    _translationCache[ocrText] = translatedText;
-                }
+                var translatedText = await _translationCache.TranslateAsync(ocrText);
 
                 roiTranslatedLines.Add(translatedText);
 

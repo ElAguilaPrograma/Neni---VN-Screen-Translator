@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using Neni.Abstractions.Entities;
 using Neni.Abstractions.Interfaces;
 using Neni.Application.Interfaces;
+using Neni.Application.Pipeline;
 using Neni.Application.Services;
 
 namespace Neni.Application;
@@ -14,6 +16,8 @@ public static class ApplicationServiceCollectionExtensions
         // Se carga una sola vez: todas las capas reciben la misma instancia en vez de leer por su cuenta.
         services.AddSingleton(sp => sp.GetRequiredService<ISettings>().Load());
         services.AddSingleton<IPipelineEngines, PipelineEngines>();
+        services.AddSingleton(sp => new TranslationCache(
+            sp.GetRequiredService<IPipelineEngines>(), sp.GetRequiredService<Settings>()));
         services.AddSingleton<ICoordinator, Coordinator>();
         return services;
     }

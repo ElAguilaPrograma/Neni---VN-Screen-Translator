@@ -2,6 +2,7 @@ using Neni.Abstractions.Entities;
 using Neni.Abstractions.Enums;
 using Neni.Abstractions.Interfaces;
 using Neni.Application.Interfaces;
+using Neni.Application.Pipeline;
 using Neni.Application.Services;
 
 namespace Neni.Tests.Application;
@@ -11,14 +12,21 @@ namespace Neni.Tests.Application;
 // dice que geometria proceso realmente cada ROI.
 internal static class CoordinatorFakes
 {
-    public static Coordinator CreateCoordinator() => new(
-        new Settings(TimerCycleInterval: 10),
-        new FakePipelineEngines(),
-        new FakeDeduplication(),
-        new FakeOverlay(),
-        new FakeFrameProcessor(),
-        new FakeFrameCapture(),
-        new FakeTargetSelector());
+    public static Coordinator CreateCoordinator()
+    {
+        var settings = new Settings(TimerCycleInterval: 10);
+        var engines = new FakePipelineEngines();
+
+        return new Coordinator(
+            settings,
+            engines,
+            new TranslationCache(engines, settings),
+            new FakeDeduplication(),
+            new FakeOverlay(),
+            new FakeFrameProcessor(),
+            new FakeFrameCapture(),
+            new FakeTargetSelector());
+    }
 
     private sealed class FakePipelineEngines : IPipelineEngines
     {
