@@ -1,5 +1,4 @@
 using Neni.Abstractions.Entities;
-using Neni.Abstractions.Enums;
 
 namespace Neni.Abstractions.Interfaces;
 

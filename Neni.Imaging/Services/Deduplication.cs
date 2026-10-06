@@ -32,14 +32,17 @@ internal sealed class Deduplication : IDeduplication
 
         // Los bordes se calculan sobre el gris SIN cuantizar, cuantizar es solo para la comparacion
         // exacta de la primera etapa.
-        return new FrameSignature(quantized, DetectEdges(gray, width, height), width, height);
+        return new EdgeFrameSignature(quantized, DetectEdges(gray, width, height), width, height);
     }
 
-    public bool IsDuplicate(FrameSignature current, FrameSignature? previous)
+    public bool IsDuplicate(FrameSignature currentSignature, FrameSignature? previousSignature)
     {
         // Primer frame de esta ROI, no hay contra que comparar, hay que correr el OCR.
-        if (previous is null)
+        if (previousSignature is null)
             return false;
+
+        var current = AsEdgeSignature(currentSignature, nameof(currentSignature));
+        var previous = AsEdgeSignature(previousSignature, nameof(previousSignature));
 
         // La ROI cambio de tamaño, las firmas no son comparables, se trata como cambio.
         if (current.Width != previous.Width || current.Height != previous.Height)
@@ -262,4 +265,10 @@ internal sealed class Deduplication : IDeduplication
 
         return edges;
     }
+
+    // Las firmas solo se comparan con firmas de esta misma implementacion.
+    private static EdgeFrameSignature AsEdgeSignature(FrameSignature signature, string paramName)
+        => signature as EdgeFrameSignature
+           ?? throw new ArgumentException(
+               $"Deduplication solo compara firmas propias, recibio {signature.GetType().Name}.", paramName);
 }

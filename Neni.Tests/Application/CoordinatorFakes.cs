@@ -76,9 +76,11 @@ internal static class CoordinatorFakes
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
+    private sealed record FakeSignature : FrameSignature;
+
     private sealed class FakeDeduplication : IDeduplication
     {
-        public FrameSignature ComputeSignature(Frame frame) => new([], [], frame.Width, frame.Height);
+        public FrameSignature ComputeSignature(Frame frame) => new FakeSignature();
         public bool IsDuplicate(FrameSignature current, FrameSignature? previous) => false;
     }
 
