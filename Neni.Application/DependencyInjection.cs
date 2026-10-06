@@ -20,6 +20,7 @@ public static class ApplicationServiceCollectionExtensions
             sp.GetRequiredService<IPipelineEngines>(), sp.GetRequiredService<Settings>()));
         services.AddSingleton<OverlayTracker>();
         services.AddSingleton<RoiProcessor>();
+        services.AddSingleton<CycleRunner>();
         services.AddSingleton<ICoordinator, Coordinator>();
         return services;
     }

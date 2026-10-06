@@ -14,34 +14,39 @@ internal static class CoordinatorFakes
 {
     public static Coordinator CreateCoordinator()
     {
+        var (cycleRunner, engines, frameCapture) = CreateCycleRunner();
+        return new Coordinator(engines, cycleRunner, frameCapture, new FakeTargetSelector());
+    }
+
+    public static (CycleRunner Runner, FakePipelineEngines Engines, FakeFrameCapture FrameCapture) CreateCycleRunner()
+    {
         var settings = new Settings(TimerCycleInterval: 10);
         var engines = new FakePipelineEngines();
         var overlay = new FakeOverlay();
+        var frameCapture = new FakeFrameCapture();
+        var roiProcessor = new RoiProcessor(
+            new FakeFrameProcessor(), new FakeDeduplication(), engines, new TranslationCache(engines, settings), settings);
 
-        return new Coordinator(
-            settings,
-            engines,
-            new RoiProcessor(
-                new FakeFrameProcessor(), new FakeDeduplication(), engines, new TranslationCache(engines, settings), settings),
-            new OverlayTracker(overlay),
-            overlay,
-            new FakeFrameCapture(),
-            new FakeTargetSelector());
+        return (new CycleRunner(settings, frameCapture, overlay, roiProcessor, new OverlayTracker(overlay)), engines, frameCapture);
     }
 
-    private sealed class FakePipelineEngines : IPipelineEngines
+    internal sealed class FakePipelineEngines : IPipelineEngines
     {
         public bool IsReady => true;
-        public IOcr Ocr { get; } = new FakeOcr();
+        public FakeOcr FakeOcr { get; } = new();
+        public IOcr Ocr => FakeOcr;
         public ITranslator Translator { get; } = new FakeTranslator();
         public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
-    private sealed class FakeOcr : IOcr
+    internal sealed class FakeOcr : IOcr
     {
+        public int Detections { get; private set; }
+
         public Task<OcrResult> DetectAsync(Frame frame, CancellationToken cancellationToken = default)
         {
+            Detections++;
             TextPoint[] box = [new(0, 0), new(1, 0), new(1, 1), new(0, 1)];
             return Task.FromResult(new OcrResult([new OcrTextBlock($"{frame.Width}", box, 1f)]));
         }
@@ -76,12 +81,22 @@ internal static class CoordinatorFakes
     }
 
     // Devuelve siempre la misma instancia, como LinuxFrameCapture con una pantalla estatica.
-    private sealed class FakeFrameCapture : IFrameCapture
+    internal sealed class FakeFrameCapture : IFrameCapture
     {
         private readonly Frame _frame = new(new byte[4], 1, 1, 4, PixelFormat.Bgra8888);
 
+        public bool FailNextGrab { get; set; }
+
         public Task AttachToTargetAsync(CaptureTarget target, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<Frame> GrabFrameAsync(CancellationToken cancellationToken = default) => Task.FromResult(_frame);
+
+        public Task<Frame> GrabFrameAsync(CancellationToken cancellationToken = default)
+        {
+            if (!FailNextGrab)
+                return Task.FromResult(_frame);
+
+            FailNextGrab = false;
+            throw new InvalidOperationException("Fallo simulado de la captura.");
+        }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 

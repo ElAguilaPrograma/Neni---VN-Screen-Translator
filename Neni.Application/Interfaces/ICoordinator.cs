@@ -34,10 +34,4 @@ public interface ICoordinator : IAsyncDisposable
 
 	/// <summary>Detiene la pipeline, espera a que el ciclo termine y limpia el estado de la sesion.</summary>
 	Task StopCycle();
-
-	/// <summary>
-	/// Ejecuta una sola vuelta de la pipeline sobre las ROIs actuales. Devuelve el texto de cada ROI
-	/// indexado por RoiId (vacio si no hay ROIs), o null si la pipeline no esta activa.
-	/// </summary>
-	Task<IReadOnlyDictionary<int, string>?> ProcessCycle();
 }
