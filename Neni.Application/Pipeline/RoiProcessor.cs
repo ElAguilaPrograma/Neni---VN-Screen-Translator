@@ -14,7 +14,7 @@ internal sealed class RoiProcessor
     private readonly IPipelineEngines _engines;
     private readonly ITextNormalizer _textNormalizer;
     private readonly TranslationCache _translationCache;
-    private readonly Settings _settings;
+    private readonly TranslationSettings _settings;
     private readonly ILogger<RoiProcessor> _logger;
     // Firma del ultimo frame DESPACHADO a OCR por ROI (no la de la vuelta anterior): solo se escribe
     // cuando la ROI se proceso completa. Ver la nota en IDeduplication.IsDuplicate.
@@ -26,7 +26,7 @@ internal sealed class RoiProcessor
         IPipelineEngines engines,
         ITextNormalizer textNormalizer,
         TranslationCache translationCache,
-        Settings settings,
+        TranslationSettings settings,
         ILogger<RoiProcessor> logger)
     {
         _logger = logger;

@@ -12,7 +12,7 @@ public class TranslationCacheTest
     public async Task Misma_linea_se_traduce_una_sola_vez()
     {
         var engines = new CountingEngines();
-        var cache = new TranslationCache(engines, new Settings());
+        var cache = new TranslationCache(engines, new TranslationSettings());
 
         await cache.TranslateAsync("hola");
         await cache.TranslateAsync("hola");
@@ -24,7 +24,7 @@ public class TranslationCacheTest
     public async Task Al_llenarse_desaloja_la_linea_usada_hace_mas_tiempo()
     {
         var engines = new CountingEngines();
-        var cache = new TranslationCache(engines, new Settings(), capacity: 2);
+        var cache = new TranslationCache(engines, new TranslationSettings(), capacity: 2);
 
         await cache.TranslateAsync("a");
         await cache.TranslateAsync("b");

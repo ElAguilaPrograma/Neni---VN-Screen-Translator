@@ -15,11 +15,11 @@ internal sealed class Deduplication : IDeduplication
     private readonly int _maxSignatureSide;
     private readonly int _quantStep;
 
-    public Deduplication(Settings settings)
+    public Deduplication(DeduplicationSettings settings)
     {
-        _minEdgeChangedRatio = settings.DeduplicationMinEdgeChangedRatio;
-        _maxSignatureSide = settings.DeduplicationMaxSignatureSide;
-        _quantStep = settings.DeduplicationQuantStep;
+        _minEdgeChangedRatio = settings.MinEdgeChangedRatio;
+        _maxSignatureSide = settings.MaxSignatureSide;
+        _quantStep = settings.QuantStep;
     }
 
     public FrameSignature ComputeSignature(Frame frame)

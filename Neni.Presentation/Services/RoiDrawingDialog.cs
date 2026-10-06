@@ -9,9 +9,9 @@ namespace Neni.Presentation.Services;
 // sin preview en vivo mientras el usuario dibuja. No guarda ROIs: el dueño es el ICoordinator.
 internal sealed class RoiDrawingDialog : IRoiDrawingDialog
 {
-    private readonly Settings _settings;
+    private readonly RoiSettings _settings;
 
-    public RoiDrawingDialog(Settings settings)
+    public RoiDrawingDialog(RoiSettings settings)
     {
         _settings = settings;
     }

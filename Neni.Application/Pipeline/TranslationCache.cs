@@ -11,13 +11,13 @@ internal sealed class TranslationCache
     public const int DefaultCapacity = 512;
 
     private readonly IPipelineEngines _engines;
-    private readonly Settings _settings;
+    private readonly TranslationSettings _settings;
     private readonly int _capacity;
     private readonly Dictionary<string, LinkedListNode<(string Source, string Translated)>> _entries = new();
     // Mas reciente al frente; se desaloja desde el final.
     private readonly LinkedList<(string Source, string Translated)> _recency = new();
 
-    public TranslationCache(IPipelineEngines engines, Settings settings, int capacity = DefaultCapacity)
+    public TranslationCache(IPipelineEngines engines, TranslationSettings settings, int capacity = DefaultCapacity)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(capacity, 1);
 

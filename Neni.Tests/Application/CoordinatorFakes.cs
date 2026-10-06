@@ -21,14 +21,14 @@ internal static class CoordinatorFakes
 
     public static (CycleRunner Runner, FakePipelineEngines Engines, FakeFrameCapture FrameCapture) CreateCycleRunner()
     {
-        var settings = new Settings(TimerCycleInterval: 10);
+        var translationSettings = new TranslationSettings();
         var engines = new FakePipelineEngines();
         var overlay = new FakeOverlay();
         var frameCapture = new FakeFrameCapture();
         var roiProcessor = new RoiProcessor(
-            new FakeFrameProcessor(), new FakeDeduplication(), engines, new IdentityNormalizer(), new TranslationCache(engines, settings), settings, NullLogger<RoiProcessor>.Instance);
+            new FakeFrameProcessor(), new FakeDeduplication(), engines, new IdentityNormalizer(), new TranslationCache(engines, translationSettings), translationSettings, NullLogger<RoiProcessor>.Instance);
 
-        return (new CycleRunner(settings, frameCapture, overlay, roiProcessor, new OverlayTracker(overlay)), engines, frameCapture);
+        return (new CycleRunner(new CycleSettings(TimerCycleInterval: 10), frameCapture, overlay, roiProcessor, new OverlayTracker(overlay)), engines, frameCapture);
     }
 
     internal sealed class FakePipelineEngines : IPipelineEngines

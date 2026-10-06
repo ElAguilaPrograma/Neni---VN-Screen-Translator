@@ -5,12 +5,12 @@ using Neni.Application.Interfaces;
 
 namespace Neni.Application.Pipeline;
 
-// Bucle de la pipeline: una vuelta cada Settings.TimerCycleInterval ms hasta que se detenga. Es el
+// Bucle de la pipeline: una vuelta cada CycleSettings.TimerCycleInterval ms hasta que se detenga. Es el
 // unico hilo que toca el estado por ROI (RoiProcessor, OverlayTracker y los textos de aqui); la
 // unica entrada que cruza hilos es la lista de ROIs, que llega como snapshot inmutable.
 internal sealed class CycleRunner
 {
-    private readonly Settings _settings;
+    private readonly CycleSettings _settings;
     private readonly IFrameCapture _frameCapture;
     private readonly IOverlay _overlay;
     private readonly RoiProcessor _roiProcessor;
@@ -27,7 +27,7 @@ internal sealed class CycleRunner
     private IReadOnlyList<RegionOfInterest>? _lastProcessedRois;
 
     public CycleRunner(
-        Settings settings,
+        CycleSettings settings,
         IFrameCapture frameCapture,
         IOverlay overlay,
         RoiProcessor roiProcessor,
@@ -51,7 +51,7 @@ internal sealed class CycleRunner
         var interval = _settings.TimerCycleInterval;
 
         if (interval <= 0)
-            throw new InvalidOperationException("Settings.TimerCycleInterval debe ser mayor a 0.");
+            throw new InvalidOperationException("CycleSettings.TimerCycleInterval debe ser mayor a 0.");
 
         if (_running)
             throw new InvalidOperationException("El ciclo ya esta corriendo.");

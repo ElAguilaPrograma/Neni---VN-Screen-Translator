@@ -14,7 +14,7 @@ public sealed class OcrEngineFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         var modelManager = new RapidOcrModelManagerService();
-        Engine = await Neni.Ocr.Services.Ocr.CreateAsync(modelManager, new Settings(), OcrModelSize.Small);
+        Engine = await Neni.Ocr.Services.Ocr.CreateAsync(modelManager, new OcrSettings(ModelSize: OcrModelSize.Small));
     }
 
     public async Task DisposeAsync()

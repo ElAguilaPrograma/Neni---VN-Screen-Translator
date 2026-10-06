@@ -14,7 +14,7 @@ public static class OcrServiceCollectionExtensions
         services.AddSingleton(sp => new RapidOcrModelManagerService(
             logger: sp.GetRequiredService<ILogger<RapidOcrModelManagerService>>()));
         services.AddSingleton<IOcrEngineFactory>(sp => new RapidOcrEngineFactory(
-            sp.GetRequiredService<Settings>(),
+            sp.GetRequiredService<OcrSettings>(),
             sp.GetRequiredService<RapidOcrModelManagerService>(),
             logger: sp.GetRequiredService<ILogger<Services.Ocr>>()));
         services.AddSingleton<ITextNormalizer, ScriptTextNormalizer>();

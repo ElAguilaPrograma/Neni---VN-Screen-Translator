@@ -78,9 +78,10 @@ public class RoiProcessorTest
 
     private static RoiProcessor CreateProcessor(FakeEngines engines)
     {
-        var settings = new Settings();
+        var translationSettings = new TranslationSettings();
         return new RoiProcessor(
-            new FrameProcessor(), new Deduplication(settings), engines, new CoordinatorFakes.IdentityNormalizer(), new TranslationCache(engines, settings), settings, NullLogger<RoiProcessor>.Instance);
+            new FrameProcessor(), new Deduplication(new DeduplicationSettings()), engines, new CoordinatorFakes.IdentityNormalizer(),
+            new TranslationCache(engines, translationSettings), translationSettings, NullLogger<RoiProcessor>.Instance);
     }
 
     private sealed class FakeEngines : IPipelineEngines, IOcr, ITranslator

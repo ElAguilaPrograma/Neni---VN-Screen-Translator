@@ -26,21 +26,20 @@ internal sealed class Ocr : IOcr
     // Crea y carga un motor RapidOcr. Resuelve los modelos de PP-OCRv6 del tamaño indicado antes de devolver la instancia
     public static async Task<Ocr> CreateAsync(
         RapidOcrModelManagerService modelManager,
-        Settings appSettings,
-        OcrModelSize modelSize = OcrModelSize.Tiny,
+        OcrSettings settings,
         RapidOcrOptions? options = null,
         ILogger? logger = null,
         CancellationToken cancellationToken = default)
     {
         logger ??= NullLogger.Instance;
-        RapidOcrModelPaths paths = await modelManager.DetectOcrModelAsync(modelSize, cancellationToken);
+        RapidOcrModelPaths paths = await modelManager.DetectOcrModelAsync(settings.ModelSize, cancellationToken);
 
         var nativeEngine = new RapidOcrNet.RapidOcr();
 
         // InitModels es sincrono y pesado, se despacha a un thread pool para no bloquear el caller
         await Task.Run(() =>
         {
-            using SessionOptions sessionOptions = ConfigureInferenceSession(appSettings.InferenceDevice, logger, out var actualDevice);
+            using SessionOptions sessionOptions = ConfigureInferenceSession(settings.InferenceDevice, logger, out var actualDevice);
             logger.LogInformation("Motor de OCR usando el dispositivo de inferencia {Device}", actualDevice);
             // Hay que pasar sessionOptions al overload que la acepta explicitamente:
             // el overload sin SessionOptions ignora silenciosamente la config de CUDA/CPU
