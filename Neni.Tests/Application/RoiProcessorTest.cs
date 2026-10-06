@@ -80,7 +80,7 @@ public class RoiProcessorTest
     {
         var settings = new Settings();
         return new RoiProcessor(
-            new FrameProcessor(), new Deduplication(settings), engines, new TranslationCache(engines, settings), settings, NullLogger<RoiProcessor>.Instance);
+            new FrameProcessor(), new Deduplication(settings), engines, new CoordinatorFakes.IdentityNormalizer(), new TranslationCache(engines, settings), settings, NullLogger<RoiProcessor>.Instance);
     }
 
     private sealed class FakeEngines : IPipelineEngines, IOcr, ITranslator
@@ -99,7 +99,6 @@ public class RoiProcessorTest
             return Task.FromResult(new OcrResult([new OcrTextBlock("texto detectado", box, 1f)]));
         }
 
-        public string NormalizeText(string text, Languages sourceLanguage) => text;
 
         public Task<string> TranslateAsync(string text, Languages sourceLanguage, Languages targetLanguage,
             CancellationToken cancellationToken = default)

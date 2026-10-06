@@ -82,9 +82,6 @@ internal sealed class Ocr : IOcr
         return MapToAbstraction(native);
     }
 
-    public string NormalizeText(string text, Languages sourceLanguage) =>
-        TextNormalizer.Normalize(text, TextNormalizer.ScriptFor(sourceLanguage));
-
     public async ValueTask DisposeAsync()
     {
         _engine.Dispose();

@@ -8,7 +8,7 @@ namespace Neni.Ocr;
 
 public static class OcrServiceCollectionExtensions
 {
-    /// <summary>Registra el motor de OCR (RapidOcr) detras de IOcrEngineFactory.</summary>
+    /// <summary>Registra el motor de OCR (RapidOcr) detras de IOcrEngineFactory y la normalizacion de su texto.</summary>
     public static IServiceCollection AddNeniOcr(this IServiceCollection services)
     {
         services.AddSingleton(sp => new RapidOcrModelManagerService(
@@ -17,6 +17,7 @@ public static class OcrServiceCollectionExtensions
             sp.GetRequiredService<Settings>(),
             sp.GetRequiredService<RapidOcrModelManagerService>(),
             logger: sp.GetRequiredService<ILogger<Services.Ocr>>()));
+        services.AddSingleton<ITextNormalizer, ScriptTextNormalizer>();
         return services;
     }
 }

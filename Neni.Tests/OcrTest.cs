@@ -1,6 +1,7 @@
 using Neni.Abstractions.Entities;
 using Neni.Abstractions.Enums;
 using Neni.Abstractions.Interfaces;
+using Neni.Ocr.Services;
 using Neni.Tests.Ocr.Helpers;
 using Xunit.Abstractions;
 
@@ -38,7 +39,7 @@ public class OcrTest
         _output.WriteLine(result.FullText);
         // Texto crudo vs normalizado, lado a lado, para inspección manual con --logger detailed.
         _output.WriteLine($"[{fileName} normalizado]");
-        _output.WriteLine(_engine.NormalizeText(result.FullText, Languages.English));
+        _output.WriteLine(new ScriptTextNormalizer().Normalize(result.FullText, Languages.English));
 
         Assert.NotEmpty(result.Blocks);
     }

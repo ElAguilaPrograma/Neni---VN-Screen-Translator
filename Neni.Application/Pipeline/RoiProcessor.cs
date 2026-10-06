@@ -12,6 +12,7 @@ internal sealed class RoiProcessor
     private readonly IFrameProcessor _frameProcessor;
     private readonly IDeduplication _deduplication;
     private readonly IPipelineEngines _engines;
+    private readonly ITextNormalizer _textNormalizer;
     private readonly TranslationCache _translationCache;
     private readonly Settings _settings;
     private readonly ILogger<RoiProcessor> _logger;
@@ -23,6 +24,7 @@ internal sealed class RoiProcessor
         IFrameProcessor frameProcessor,
         IDeduplication deduplication,
         IPipelineEngines engines,
+        ITextNormalizer textNormalizer,
         TranslationCache translationCache,
         Settings settings,
         ILogger<RoiProcessor> logger)
@@ -31,6 +33,7 @@ internal sealed class RoiProcessor
         _frameProcessor = frameProcessor;
         _deduplication = deduplication;
         _engines = engines;
+        _textNormalizer = textNormalizer;
         _translationCache = translationCache;
         _settings = settings;
     }
@@ -80,7 +83,7 @@ internal sealed class RoiProcessor
         for (var blockIndex = 0; blockIndex < orderedBlocks.Count; blockIndex++)
         {
             var block = orderedBlocks[blockIndex];
-            var text = _engines.Ocr.NormalizeText(block.Text, _settings.SourceLanguage);
+            var text = _textNormalizer.Normalize(block.Text, _settings.SourceLanguage);
             if (string.IsNullOrWhiteSpace(text))
                 continue;
 

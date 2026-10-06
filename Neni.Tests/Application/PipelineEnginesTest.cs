@@ -87,7 +87,6 @@ public class PipelineEnginesTest
     {
         public bool Disposed { get; private set; }
         public Task<OcrResult> DetectAsync(Frame frame, CancellationToken cancellationToken = default) => Task.FromResult(OcrResult.Empty);
-        public string NormalizeText(string text, Languages sourceLanguage) => text;
 
         public ValueTask DisposeAsync()
         {

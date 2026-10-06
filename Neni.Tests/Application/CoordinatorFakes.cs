@@ -26,7 +26,7 @@ internal static class CoordinatorFakes
         var overlay = new FakeOverlay();
         var frameCapture = new FakeFrameCapture();
         var roiProcessor = new RoiProcessor(
-            new FakeFrameProcessor(), new FakeDeduplication(), engines, new TranslationCache(engines, settings), settings, NullLogger<RoiProcessor>.Instance);
+            new FakeFrameProcessor(), new FakeDeduplication(), engines, new IdentityNormalizer(), new TranslationCache(engines, settings), settings, NullLogger<RoiProcessor>.Instance);
 
         return (new CycleRunner(settings, frameCapture, overlay, roiProcessor, new OverlayTracker(overlay)), engines, frameCapture);
     }
@@ -60,8 +60,12 @@ internal static class CoordinatorFakes
             return Task.FromResult(new OcrResult([new OcrTextBlock($"{frame.Width}", box, 1f)]));
         }
 
-        public string NormalizeText(string text, Languages sourceLanguage) => text;
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    internal sealed class IdentityNormalizer : ITextNormalizer
+    {
+        public string Normalize(string text, Languages sourceLanguage) => text;
     }
 
     private sealed class FakeTranslator : ITranslator
