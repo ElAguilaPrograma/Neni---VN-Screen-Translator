@@ -33,5 +33,9 @@ secrets.json
 Thumbs.db
 .DS_Store
 
+## [Modelos descargados]
+# Los modelos de OCR/traducción los baja el model manager en el primer arranque
+Models/
+
 Neni.Tests/Ocr/Frames
 CLAUDE.md
