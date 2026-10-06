@@ -4,36 +4,34 @@ using Neni.Application.Interfaces;
 
 namespace Neni.Application.Services;
 
-// Aqui se debe de inicializar todo lo que sea necesario para que la aplicacion funcione,
-// primero se deben inicializar las settings, luego los servicios que dependen de esas settings,
-// como el modelo de OCR, el modelo de traducción, etc. Se debe de hacer una sola vez al inicio de la aplicacion.
+// Inicializa lo pesado que la pipeline necesita (modelo de OCR, modelo de traduccion) a partir de
+// las settings que ya cargo el contenedor. Se hace una sola vez por ejecucion.
 
 internal sealed class Initialize : IInitialize
 {
-    private readonly ISettings _settings;
     private readonly IOcrEngineFactory _ocrEngineFactory;
     private readonly ITranslatorEngineFactory _translatorEngineFactory;
 
-    public Settings AppSettings { get; private set; } = null!;
+    public bool IsInitialized { get; private set; }
+    public Settings AppSettings { get; }
     public IOcr Engine { get; private set; } = null!;
     public ITranslator Translator { get; private set; } = null!;
 
     public Initialize(IOcrEngineFactory ocrEngineFactory,
         ITranslatorEngineFactory translatorEngineFactory,
-        ISettings settings)
+        Settings settings)
     {
         _ocrEngineFactory = ocrEngineFactory;
         _translatorEngineFactory = translatorEngineFactory;
-        _settings = settings;
+        AppSettings = settings;
     }
 
     /// <summary>
-    /// Carga settings, motor de OCR y traductor. Todo o nada: las propiedades solo se asignan si
-    /// las tres piezas se crearon bien, porque Coordinator usa AppSettings como bandera de "listo".
+    /// Carga el motor de OCR y el traductor. Todo o nada: solo se marca IsInitialized si las dos
+    /// piezas se crearon bien, porque Coordinator lo usa como bandera de "listo".
     /// </summary>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        var appSettings = _settings.Load();
         var engine = await _ocrEngineFactory.CreateAsync(cancellationToken);
 
         ITranslator translator;
@@ -50,7 +48,7 @@ internal sealed class Initialize : IInitialize
 
         Engine = engine;
         Translator = translator;
-        AppSettings = appSettings;
+        IsInitialized = true;
     }
 
     /// <summary>

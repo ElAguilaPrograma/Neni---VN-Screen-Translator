@@ -7,7 +7,7 @@ namespace Neni.Application.Interfaces;
 public interface ICoordinator : IAsyncDisposable
 {
 	/// <summary>
-	/// Carga por unica vez lo pesado (settings, motor de OCR, traductor). Hay que esperarlo antes
+	/// Carga por unica vez lo pesado (motor de OCR, traductor). Hay que esperarlo antes
 	/// de StartCycle; la primera vez descarga los modelos, asi que puede tardar.
 	/// </summary>
 	Task InitializeAsync(CancellationToken cancellationToken = default);

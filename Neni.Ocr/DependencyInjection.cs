@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Neni.Abstractions.Entities;
 using Neni.Abstractions.Interfaces;
 using Neni.Ocr.Services;
 
@@ -11,7 +12,7 @@ public static class OcrServiceCollectionExtensions
     {
         services.AddSingleton(_ => new RapidOcrModelManagerService());
         services.AddSingleton<IOcrEngineFactory>(sp => new RapidOcrEngineFactory(
-            sp.GetRequiredService<ISettings>(),
+            sp.GetRequiredService<Settings>(),
             sp.GetRequiredService<RapidOcrModelManagerService>()));
         return services;
     }

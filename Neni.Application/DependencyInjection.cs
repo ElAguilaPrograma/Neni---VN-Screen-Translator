@@ -11,6 +11,8 @@ public static class ApplicationServiceCollectionExtensions
     public static IServiceCollection AddNeniApplication(this IServiceCollection services)
     {
         services.AddSingleton<ISettings, DefaultSettings>();
+        // Se carga una sola vez: todas las capas reciben la misma instancia en vez de leer por su cuenta.
+        services.AddSingleton(sp => sp.GetRequiredService<ISettings>().Load());
         services.AddSingleton<IInitialize, Initialize>();
         services.AddSingleton<ICoordinator, Coordinator>();
         return services;

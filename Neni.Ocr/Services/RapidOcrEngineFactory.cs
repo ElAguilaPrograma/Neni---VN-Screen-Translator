@@ -1,3 +1,4 @@
+using Neni.Abstractions.Entities;
 using Neni.Abstractions.Interfaces;
 using RapidOcrNet;
 
@@ -7,12 +8,12 @@ namespace Neni.Ocr.Services;
 // Mantiene los tipos especificos de RapidOcr (modelManager, options) fuera de Application.
 internal sealed class RapidOcrEngineFactory : IOcrEngineFactory
 {
-    private readonly ISettings _settings;
+    private readonly Settings _settings;
     private readonly RapidOcrModelManagerService _modelManager;
     private readonly RapidOcrOptions? _options;
 
     public RapidOcrEngineFactory(
-        ISettings settings,
+        Settings settings,
         RapidOcrModelManagerService? modelManager = null,
         RapidOcrOptions? options = null)
     {
@@ -23,7 +24,6 @@ internal sealed class RapidOcrEngineFactory : IOcrEngineFactory
 
     public async Task<IOcr> CreateAsync(CancellationToken cancellationToken = default)
     {
-        var appSettings = _settings.Load();
-        return await Ocr.CreateAsync(_modelManager, appSettings, appSettings.OcrModelSize, _options, cancellationToken);
+        return await Ocr.CreateAsync(_modelManager, _settings, _settings.OcrModelSize, _options, cancellationToken);
     }
 }

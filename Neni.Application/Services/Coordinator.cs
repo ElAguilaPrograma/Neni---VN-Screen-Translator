@@ -50,12 +50,12 @@ internal sealed class Coordinator : ICoordinator
     }
 
     /// <summary>
-    /// Carga por unica vez lo pesado (settings, motor de OCR, traductor). Es idempotente:
+    /// Carga por unica vez lo pesado (motor de OCR, traductor). Es idempotente:
     /// re-inicializar dejaria sin liberar la sesion nativa del motor anterior.
     /// </summary>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        if (_initialize.AppSettings is not null)
+        if (_initialize.IsInitialized)
             return;
 
         await _initialize.InitializeAsync(cancellationToken);
@@ -357,11 +357,11 @@ internal sealed class Coordinator : ICoordinator
     /// <summary>Copia el texto actual de cada ROI, para no exponer el diccionario mutable interno.</summary>
     private IReadOnlyDictionary<int, string> Snapshot() => new Dictionary<int, string>(_translationTexts);
 
-    // _initialize.AppSettings/Engine/Translator solo quedan listos después de InitializeAsync();
+    // _initialize.Engine/Translator solo quedan listos después de InitializeAsync();
     // si alguien llama StartCycle/ProcessCycle antes de eso, fallamos con un mensaje claro en vez de un NRE opaco.
     private void EnsureInitialized()
     {
-        if (_initialize.AppSettings is null)
+        if (!_initialize.IsInitialized)
             throw new InvalidOperationException("Initialize.InitializeAsync() debe ser invocado (y esperado) antes de iniciar el ciclo.");
     }
 
