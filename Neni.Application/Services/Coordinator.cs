@@ -34,13 +34,12 @@ internal sealed class Coordinator : ICoordinator
     private Task? _cycleTask;
     private Dictionary<int, string> _translationTexts = new Dictionary<int, string>();
     private readonly TranslationCache _translationCache;
-    // Ids de overlay actualmente en pantalla, por RoiId. Un ROI puede generar varios
-    // items de overlay (uno por bloque de texto detectado por el OCR).
-    private Dictionary<int, HashSet<int>> _activeOverlayItemIdsByRoi = new Dictionary<int, HashSet<int>>();
+    private readonly OverlayTracker _overlayTracker;
 
     public Coordinator(Settings settings,
         IPipelineEngines engines,
         TranslationCache translationCache,
+        OverlayTracker overlayTracker,
         IDeduplication deduplication,
         IOverlay overlay,
         IFrameProcessor frameProcessor,
@@ -50,6 +49,7 @@ internal sealed class Coordinator : ICoordinator
         _settings = settings;
         _engines = engines;
         _translationCache = translationCache;
+        _overlayTracker = overlayTracker;
         _deduplication = deduplication;
         _overlay = overlay;
         _frameProcessor = frameProcessor;
@@ -218,7 +218,7 @@ internal sealed class Coordinator : ICoordinator
         stopwatch.Stop();
         this._overlaySession = false;
         await _overlay.StopAsync();
-        _activeOverlayItemIdsByRoi.Clear();
+        _overlayTracker.Reset();
         _lastWindowFrame = null;
         _lastProcessedRois = null;
         _lastSignatures.Clear();
@@ -292,12 +292,8 @@ internal sealed class Coordinator : ICoordinator
                 continue;
             }
 
-            var overlayCapibility = _overlay.CurrentOverlayCapability;
             var orderedBlocks = OrderBlocksReadingOrder(ocrResult.Blocks);
-            var activeOverlayItemIds = _activeOverlayItemIdsByRoi.GetValueOrDefault(roi.RoiId);
-            var currentOverlayItemIds = new HashSet<int>();
-            var roiTranslatedLines = new List<string>();
-            var newOverlayItems = new List<TranslationOverlayItem>();
+            var translatedBlocks = new List<TranslatedBlock>();
 
             for (var blockIndex = 0; blockIndex < orderedBlocks.Count; blockIndex++)
             {
@@ -307,53 +303,11 @@ internal sealed class Coordinator : ICoordinator
                     continue;
 
                 var translatedText = await _translationCache.TranslateAsync(ocrText);
-
-                roiTranslatedLines.Add(translatedText);
-
-                if (overlayCapibility == OverlayCapability.CompanionWindowOnly)
-                {
-                    // Sin overlay directo disponible: el texto traducido ya quedó acumulado arriba.
-                    continue;
-                }
-
-                IReadOnlyList<TextPoint> boxPoints = block.BoxPoints;
-                var overlayItemId = MakeOverlayItemId(roi.RoiId, blockIndex);
-                currentOverlayItemIds.Add(overlayItemId);
-
-                var overlayItem = new TranslationOverlayItem(
-                    overlayItemId,
-                    ocrText,
-                    translatedText,
-                    new WindowBounds(
-                        (int)boxPoints[0].X,
-                        (int)boxPoints[0].Y,
-                        (int)(boxPoints[2].X - boxPoints[0].X),
-                        (int)(boxPoints[2].Y - boxPoints[0].Y)));
-
-                if (activeOverlayItemIds != null && activeOverlayItemIds.Contains(overlayItemId))
-                {
-                    // Ya existe un overlay para este bloque: actualizamos su contenido.
-                    _overlay.UpdateOverlayContent(overlayItem);
-                }
-                else
-                {
-                    newOverlayItems.Add(overlayItem);
-                }
+                translatedBlocks.Add(new TranslatedBlock(blockIndex, ocrText, translatedText, block.BoxPoints));
             }
 
-            if (newOverlayItems.Count > 0)
-                await _overlay.RenderTranslationOverlayAsync(newOverlayItems);
-
-            // Bloques que estaban en pantalla el ciclo anterior para esta ROI y ya no aparecieron
-            // (opción de menú cerrada, texto acortado, etc.): eliminamos su overlay.
-            if (activeOverlayItemIds != null)
-            {
-                foreach (var staleId in activeOverlayItemIds.Except(currentOverlayItemIds))
-                    _overlay.RemoveOverlayContent(staleId);
-            }
-
-            _activeOverlayItemIdsByRoi[roi.RoiId] = currentOverlayItemIds;
-            _translationTexts[roi.RoiId] = string.Join(Environment.NewLine, roiTranslatedLines);
+            await _overlayTracker.ApplyAsync(roi, translatedBlocks);
+            _translationTexts[roi.RoiId] = string.Join(Environment.NewLine, translatedBlocks.Select(b => b.TranslatedText));
         }
         return Snapshot();
     }
@@ -370,12 +324,7 @@ internal sealed class Coordinator : ICoordinator
 
         foreach (var staleRoi in _lastProcessedRois.Where(roi => !currentRois.Contains(roi)))
         {
-            if (_activeOverlayItemIdsByRoi.Remove(staleRoi.RoiId, out var overlayItemIds))
-            {
-                foreach (var overlayItemId in overlayItemIds)
-                    _overlay.RemoveOverlayContent(overlayItemId);
-            }
-
+            _overlayTracker.Forget(staleRoi.RoiId);
             _lastSignatures.Remove(staleRoi.RoiId);
             _translationTexts.Remove(staleRoi.RoiId);
         }
@@ -392,14 +341,8 @@ internal sealed class Coordinator : ICoordinator
             throw new InvalidOperationException("InitializeAsync() debe ser invocado (y esperado) antes de iniciar el ciclo.");
     }
 
-    // Id determinístico y estable para el overlay de un bloque de texto dentro de una ROI, derivado
-    // de RoiId y la posición del bloque (de arriba hacia abajo) en el resultado de OCR de este ciclo.
-    // Asume RoiId pequeño (Settings.MaxPendingRois = 8) y como máximo unos pocos cientos de bloques por ROI.
-    private static int MakeOverlayItemId(int roiId, int blockIndex)
-        => roiId * 1000 + blockIndex;
-
     // Ordena los bloques de texto de arriba hacia abajo para que el índice de cada bloque
-    // se mantenga estable entre ciclos y así pueda usarse en MakeOverlayItemId.
+    // se mantenga estable entre ciclos y el overlay pueda reconocerlo.
     private static IReadOnlyList<OcrTextBlock> OrderBlocksReadingOrder(IReadOnlyList<OcrTextBlock> blocks)
         => blocks.OrderBy(b => b.BoxPoints[0].Y).ThenBy(b => b.BoxPoints[0].X).ToList();
 

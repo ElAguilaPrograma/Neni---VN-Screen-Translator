@@ -18,6 +18,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<IPipelineEngines, PipelineEngines>();
         services.AddSingleton(sp => new TranslationCache(
             sp.GetRequiredService<IPipelineEngines>(), sp.GetRequiredService<Settings>()));
+        services.AddSingleton<OverlayTracker>();
         services.AddSingleton<ICoordinator, Coordinator>();
         return services;
     }

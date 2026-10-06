@@ -16,13 +16,15 @@ internal static class CoordinatorFakes
     {
         var settings = new Settings(TimerCycleInterval: 10);
         var engines = new FakePipelineEngines();
+        var overlay = new FakeOverlay();
 
         return new Coordinator(
             settings,
             engines,
             new TranslationCache(engines, settings),
+            new OverlayTracker(overlay),
             new FakeDeduplication(),
-            new FakeOverlay(),
+            overlay,
             new FakeFrameProcessor(),
             new FakeFrameCapture(),
             new FakeTargetSelector());
