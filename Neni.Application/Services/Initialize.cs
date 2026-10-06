@@ -27,11 +27,30 @@ public sealed class Initialize : IInitialize
         _settings = settings;
     }
 
+    /// <summary>
+    /// Carga settings, motor de OCR y traductor. Todo o nada: las propiedades solo se asignan si
+    /// las tres piezas se crearon bien, porque Coordinator usa AppSettings como bandera de "listo".
+    /// </summary>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        AppSettings = _settings.Load();
-        Engine = await _ocrEngineFactory.CreateAsync(cancellationToken);
-        Translator = await _translatorEngineFactory.CreateAsync(cancellationToken);
+        var appSettings = _settings.Load();
+        var engine = await _ocrEngineFactory.CreateAsync(cancellationToken);
+
+        ITranslator translator;
+        try
+        {
+            translator = await _translatorEngineFactory.CreateAsync(cancellationToken);
+        }
+        catch
+        {
+            // Sin esto la sesion nativa del motor quedaria huerfana hasta el cierre del proceso.
+            await engine.DisposeAsync();
+            throw;
+        }
+
+        Engine = engine;
+        Translator = translator;
+        AppSettings = appSettings;
     }
 
     /// <summary>
