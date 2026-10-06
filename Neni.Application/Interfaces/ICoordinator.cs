@@ -2,8 +2,8 @@ using Neni.Abstractions.Entities;
 
 namespace Neni.Application.Interfaces;
 
-// Hereda IAsyncDisposable para que el host (App) pueda soltar en el cierre todo lo que la pipeline
-// sostiene vivo: sesion de ONNX/CUDA, tuberia de GStreamer y la sesion D-Bus del portal.
+// Hereda IAsyncDisposable para detener el ciclo en el cierre antes de que el contenedor libere lo
+// que la pipeline sostiene vivo (sesion de ONNX/CUDA, tuberia de GStreamer, sesion D-Bus del portal).
 public interface ICoordinator : IAsyncDisposable
 {
 	/// <summary>

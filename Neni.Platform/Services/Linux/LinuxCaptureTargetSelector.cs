@@ -30,8 +30,8 @@ public sealed class LinuxCaptureTargetSelector : ICaptureTargetSelector
         => _portalSession.RequestTargetAsync(reuseLastSelection, cancellationToken);
 
     /// <summary>
-    /// Cierra la sesion del portal. Se comparte con LinuxFrameCapture, pero el dueño es el selector
-    /// porque es quien la crea; el doble dispose es inofensivo.
+    /// No hace nada: la sesion del portal se comparte con LinuxFrameCapture y la libera su dueño,
+    /// el contenedor, despues de la captura que depende de ella.
     /// </summary>
-    public ValueTask DisposeAsync() => _portalSession.DisposeAsync();
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

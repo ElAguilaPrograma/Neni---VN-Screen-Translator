@@ -27,8 +27,9 @@ public class PortalCaptureDiagnosticsTest
     [ManualFact]
     public async Task GrabFrameAsync_sigue_entregando_frames_nuevos_con_fuente_en_movimiento()
     {
-        var portalSession = new PortalScreenCastSession();
-        await using var selector = new LinuxCaptureTargetSelector(portalSession);
+        // Declarada primero para que se libere al final, despues de la captura que depende de ella.
+        await using var portalSession = new PortalScreenCastSession();
+        var selector = new LinuxCaptureTargetSelector(portalSession);
         await using var frameCapture = new LinuxFrameCapture(portalSession);
 
         var target = await selector.PromptTargetSelectionAsync();
@@ -60,7 +61,8 @@ public class PortalCaptureDiagnosticsTest
     [ManualFact]
     public async Task Sesion_del_portal_se_mantiene_viva_para_un_consumidor_externo()
     {
-        await using var selector = new LinuxCaptureTargetSelector(new PortalScreenCastSession());
+        await using var portalSession = new PortalScreenCastSession();
+        var selector = new LinuxCaptureTargetSelector(portalSession);
 
         var target = await selector.PromptTargetSelectionAsync();
         Assert.NotNull(target);

@@ -217,8 +217,8 @@ public class Coordinator : ICoordinator
     }
 
     /// <summary>
-    /// Detiene el ciclo y suelta todo lo que la pipeline sostiene vivo. La captura se libera antes
-    /// que el selector porque la tuberia depende del nodo que vive en la sesion del portal.
+    /// Detiene el ciclo. No libera sus dependencias: no las creo, su dueño es el contenedor, que
+    /// libera al Coordinator primero (es lo ultimo que crea) y despues a todo lo demas.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
@@ -227,7 +227,7 @@ public class Coordinator : ICoordinator
 
         _disposed = true;
 
-        // Un fallo del ciclo no puede impedir liberar: quien espera StartCycle ya lo observa.
+        // Un fallo del ciclo no puede impedir el cierre: quien espera StartCycle ya lo observa.
         try
         {
             await StopCycle();
@@ -236,11 +236,6 @@ public class Coordinator : ICoordinator
         {
             Console.WriteLine($"Error deteniendo el ciclo durante el cierre: {ex.Message}");
         }
-
-        await _initialize.DisposeAsync();
-        await _frameCapture.DisposeAsync();
-        await _overlay.DisposeAsync();
-        await _targetSelector.DisposeAsync();
     }
 
     /// <summary>

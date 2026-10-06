@@ -18,11 +18,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- MVVM (ViewModels/Views) solo conoce Neni.Application. Las referencias de abajo
-         (Platform/Ocr/Imaging/Translation) las usa exclusivamente Composition/CoordinatorFactory,
-         el composition root: es el único lugar de esta capa autorizado a ver implementaciones
-         concretas, porque IOverlay vive aquí mismo y necesita juntarse con las demás para armar
-         el Coordinator. -->
+    <!-- Temporal: ya no se usan desde que el composition root vive en Neni.Desktop; se quitan
+         junto con el paso a internal de las implementaciones. -->
     <ProjectReference Include="../Neni.Application/Neni.Application.csproj" />
     <ProjectReference Include="../Neni.Platform/Neni.Platform.csproj" />
     <ProjectReference Include="../Neni.Ocr/Neni.Ocr.csproj" />

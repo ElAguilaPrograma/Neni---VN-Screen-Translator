@@ -14,9 +14,15 @@
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../Neni.Presentation/Neni.Presentation.csproj" />
+    <ProjectReference Include="../Neni.Application/Neni.Application.csproj" />
+    <ProjectReference Include="../Neni.Ocr/Neni.Ocr.csproj" />
+    <ProjectReference Include="../Neni.Imaging/Neni.Imaging.csproj" />
+    <ProjectReference Include="../Neni.Translation/Neni.Translation.csproj" />
+    <ProjectReference Include="../Neni.Platform/Neni.Platform.csproj" />
   </ItemGroup>
 </Project>
