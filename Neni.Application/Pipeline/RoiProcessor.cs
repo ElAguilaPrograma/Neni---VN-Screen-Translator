@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Neni.Abstractions.Entities;
 using Neni.Abstractions.Interfaces;
 using Neni.Application.Interfaces;
@@ -13,6 +14,7 @@ internal sealed class RoiProcessor
     private readonly IPipelineEngines _engines;
     private readonly TranslationCache _translationCache;
     private readonly Settings _settings;
+    private readonly ILogger<RoiProcessor> _logger;
     // Firma del ultimo frame DESPACHADO a OCR por ROI (no la de la vuelta anterior): solo se escribe
     // cuando la ROI se proceso completa. Ver la nota en IDeduplication.IsDuplicate.
     private readonly Dictionary<int, FrameSignature> _lastSignatures = new();
@@ -22,8 +24,10 @@ internal sealed class RoiProcessor
         IDeduplication deduplication,
         IPipelineEngines engines,
         TranslationCache translationCache,
-        Settings settings)
+        Settings settings,
+        ILogger<RoiProcessor> logger)
     {
+        _logger = logger;
         _frameProcessor = frameProcessor;
         _deduplication = deduplication;
         _engines = engines;
@@ -57,7 +61,7 @@ internal sealed class RoiProcessor
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Console.WriteLine($"Error procesando la ROI {roi.RoiId}: {ex.Message}");
+            _logger.LogError(ex, "Error procesando la ROI {RoiId}", roi.RoiId);
             return RoiResult.Failed(ex.Message);
         }
     }

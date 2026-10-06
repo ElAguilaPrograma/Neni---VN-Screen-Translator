@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Neni.Abstractions.Entities;
 using Neni.Abstractions.Interfaces;
 using RapidOcrNet;
@@ -11,12 +13,15 @@ internal sealed class RapidOcrEngineFactory : IOcrEngineFactory
     private readonly Settings _settings;
     private readonly RapidOcrModelManagerService _modelManager;
     private readonly RapidOcrOptions? _options;
+    private readonly ILogger _logger;
 
     public RapidOcrEngineFactory(
         Settings settings,
         RapidOcrModelManagerService? modelManager = null,
-        RapidOcrOptions? options = null)
+        RapidOcrOptions? options = null,
+        ILogger<Ocr>? logger = null)
     {
+        _logger = logger ?? NullLogger<Ocr>.Instance;
         _settings = settings;
         _modelManager = modelManager ?? new RapidOcrModelManagerService();
         _options = options;
@@ -24,6 +29,6 @@ internal sealed class RapidOcrEngineFactory : IOcrEngineFactory
 
     public async Task<IOcr> CreateAsync(CancellationToken cancellationToken = default)
     {
-        return await Ocr.CreateAsync(_modelManager, _settings, _settings.OcrModelSize, _options, cancellationToken);
+        return await Ocr.CreateAsync(_modelManager, _settings, _settings.OcrModelSize, _options, _logger, cancellationToken);
     }
 }

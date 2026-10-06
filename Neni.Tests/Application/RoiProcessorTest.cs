@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Neni.Abstractions.Entities;
 using Neni.Abstractions.Enums;
 using Neni.Abstractions.Interfaces;
@@ -79,7 +80,7 @@ public class RoiProcessorTest
     {
         var settings = new Settings();
         return new RoiProcessor(
-            new FrameProcessor(), new Deduplication(settings), engines, new TranslationCache(engines, settings), settings);
+            new FrameProcessor(), new Deduplication(settings), engines, new TranslationCache(engines, settings), settings, NullLogger<RoiProcessor>.Instance);
     }
 
     private sealed class FakeEngines : IPipelineEngines, IOcr, ITranslator

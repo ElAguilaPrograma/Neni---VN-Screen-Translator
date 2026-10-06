@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Neni.Abstractions.Enums;
 using Neni.Abstractions.Interfaces;
 
@@ -21,11 +23,16 @@ internal sealed class RapidOcrModelManagerService
 
     private readonly string _modelsRootPath;
     private readonly HttpClient _httpClient;
+    private readonly ILogger _logger;
 
-    public RapidOcrModelManagerService(string modelsRootPath = "Models", HttpClient? httpClient = null)
+    public RapidOcrModelManagerService(
+        string modelsRootPath = "Models",
+        HttpClient? httpClient = null,
+        ILogger<RapidOcrModelManagerService>? logger = null)
     {
         _modelsRootPath = modelsRootPath;
         _httpClient = httpClient ?? new HttpClient();
+        _logger = logger ?? NullLogger<RapidOcrModelManagerService>.Instance;
 
         // ModelScope's CDN (Tengine) devuelve 403 "denied by UA ACL = blacklist" a requests
         // sin User-Agent, que es lo que HttpClient envia por defecto. Sin este header la
@@ -70,9 +77,9 @@ internal sealed class RapidOcrModelManagerService
             if (File.Exists(destinationPath))
                 continue;
 
-            Console.WriteLine($"[RapidOcrModelManager] Descargando {Path.GetFileName(destinationPath)}...");
+            _logger.LogInformation("Descargando el modelo {File}", Path.GetFileName(destinationPath));
             await DownloadFileAsync(url, destinationPath, cancellationToken);
-            Console.WriteLine($"[RapidOcrModelManager] Listo: {destinationPath}");
+            _logger.LogInformation("Modelo listo en {Path}", destinationPath);
         }
 
         return new RapidOcrModelPaths(detPath, clsPath, recPath, dictPath);

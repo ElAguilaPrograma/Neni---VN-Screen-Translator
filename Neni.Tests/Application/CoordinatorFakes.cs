@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Neni.Abstractions.Entities;
 using Neni.Abstractions.Enums;
 using Neni.Abstractions.Interfaces;
@@ -15,7 +16,7 @@ internal static class CoordinatorFakes
     public static Coordinator CreateCoordinator()
     {
         var (cycleRunner, engines, frameCapture) = CreateCycleRunner();
-        return new Coordinator(engines, cycleRunner, frameCapture, new FakeTargetSelector());
+        return new Coordinator(engines, cycleRunner, frameCapture, new FakeTargetSelector(), NullLogger<Coordinator>.Instance);
     }
 
     public static (CycleRunner Runner, FakePipelineEngines Engines, FakeFrameCapture FrameCapture) CreateCycleRunner()
@@ -25,7 +26,7 @@ internal static class CoordinatorFakes
         var overlay = new FakeOverlay();
         var frameCapture = new FakeFrameCapture();
         var roiProcessor = new RoiProcessor(
-            new FakeFrameProcessor(), new FakeDeduplication(), engines, new TranslationCache(engines, settings), settings);
+            new FakeFrameProcessor(), new FakeDeduplication(), engines, new TranslationCache(engines, settings), settings, NullLogger<RoiProcessor>.Instance);
 
         return (new CycleRunner(settings, frameCapture, overlay, roiProcessor, new OverlayTracker(overlay)), engines, frameCapture);
     }

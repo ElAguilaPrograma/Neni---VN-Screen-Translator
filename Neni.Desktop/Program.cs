@@ -1,5 +1,6 @@
 using Avalonia;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Neni.Application;
 using Neni.Imaging;
 using Neni.Ocr;
@@ -31,6 +32,7 @@ sealed class Program
     /// </summary>
     private static ServiceProvider BuildServices()
         => new ServiceCollection()
+            .AddLogging(logging => logging.AddSimpleConsole(console => console.SingleLine = true))
             .AddNeniApplication()
             .AddNeniOcr()
             .AddNeniImaging()

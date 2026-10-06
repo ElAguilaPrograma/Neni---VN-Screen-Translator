@@ -1,4 +1,6 @@
 using System.Globalization;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.ML.OnnxRuntime;
 using Neni.Abstractions.Entities;
 using Neni.Abstractions.Enums;
@@ -27,8 +29,10 @@ internal sealed class Ocr : IOcr
         Settings appSettings,
         OcrModelSize modelSize = OcrModelSize.Tiny,
         RapidOcrOptions? options = null,
+        ILogger? logger = null,
         CancellationToken cancellationToken = default)
     {
+        logger ??= NullLogger.Instance;
         RapidOcrModelPaths paths = await modelManager.DetectOcrModelAsync(modelSize, cancellationToken);
 
         var nativeEngine = new RapidOcrNet.RapidOcr();
@@ -36,8 +40,8 @@ internal sealed class Ocr : IOcr
         // InitModels es sincrono y pesado, se despacha a un thread pool para no bloquear el caller
         await Task.Run(() =>
         {
-            using SessionOptions sessionOptions = ConfigureInferenceSession(appSettings.InferenceDevice, out var actualDevice);
-            Console.WriteLine($"Using inference device: {actualDevice}");
+            using SessionOptions sessionOptions = ConfigureInferenceSession(appSettings.InferenceDevice, logger, out var actualDevice);
+            logger.LogInformation("Motor de OCR usando el dispositivo de inferencia {Device}", actualDevice);
             // Hay que pasar sessionOptions al overload que la acepta explicitamente:
             // el overload sin SessionOptions ignora silenciosamente la config de CUDA/CPU
             // construida arriba y siempre inicializa con el ejecutor CPU por defecto.
@@ -87,7 +91,7 @@ internal sealed class Ocr : IOcr
         await Task.CompletedTask;
     }
 
-    private static SessionOptions ConfigureInferenceSession(InferenceDevice device, out InferenceDevice actualDevice)
+    private static SessionOptions ConfigureInferenceSession(InferenceDevice device, ILogger logger, out InferenceDevice actualDevice)
     {
         var sessionOptions = RapidOcr.GetDefaultSessionOptions();
         actualDevice = InferenceDevice.Cpu;
@@ -96,14 +100,13 @@ internal sealed class Ocr : IOcr
         {
             try
             {
-                Console.WriteLine("Attempting to use CUDA execution provider for ONNX Runtime.");
+                logger.LogDebug("Intentando usar el execution provider de CUDA en ONNX Runtime");
                 sessionOptions.AppendExecutionProvider_CUDA();
                 actualDevice = InferenceDevice.Cuda;
             }
             catch (Exception ex) when (ex is OnnxRuntimeException or EntryPointNotFoundException or DllNotFoundException)
             {
-                // Log warning: CUDA no esta disponible, se usara CPU.
-                Console.WriteLine($"Warning: CUDA no esta disponible, se usara CPU. Exception: {ex.Message}");
+                logger.LogWarning(ex, "CUDA no esta disponible, se usara CPU");
             }
         }
         return sessionOptions;

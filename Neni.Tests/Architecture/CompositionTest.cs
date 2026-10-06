@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Neni.Application;
 using Neni.Imaging;
 using Neni.Ocr;
@@ -18,6 +19,7 @@ public class CompositionTest
     public void Contenedor_resuelve_todos_los_registros_de_las_capas()
     {
         using var provider = new ServiceCollection()
+            .AddLogging()
             .AddNeniApplication()
             .AddNeniOcr()
             .AddNeniImaging()

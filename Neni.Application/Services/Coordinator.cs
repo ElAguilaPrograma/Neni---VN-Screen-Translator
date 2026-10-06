@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Neni.Abstractions.Interfaces;
 using Neni.Abstractions.Entities;
 using Neni.Abstractions.Enums;
@@ -15,6 +16,7 @@ internal sealed class Coordinator : ICoordinator
     private readonly CycleRunner _cycleRunner;
     private readonly IFrameCapture _frameCapture;
     private readonly ICaptureTargetSelector _targetSelector;
+    private readonly ILogger<Coordinator> _logger;
     private bool _disposed;
     // Unica fuente de verdad de las ROIs. Lista inmutable que se reemplaza entera: la UI la cambia
     // desde su hilo mientras el ciclo la lee desde el pool, y un swap de referencia es atomico.
@@ -25,8 +27,10 @@ internal sealed class Coordinator : ICoordinator
         IPipelineEngines engines,
         CycleRunner cycleRunner,
         IFrameCapture frameCapture,
-        ICaptureTargetSelector targetSelector)
+        ICaptureTargetSelector targetSelector,
+        ILogger<Coordinator> logger)
     {
+        _logger = logger;
         _engines = engines;
         _cycleRunner = cycleRunner;
         _frameCapture = frameCapture;
@@ -139,7 +143,7 @@ internal sealed class Coordinator : ICoordinator
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error deteniendo el ciclo durante el cierre: {ex.Message}");
+            _logger.LogError(ex, "Error deteniendo el ciclo durante el cierre");
         }
     }
 }
