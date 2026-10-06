@@ -136,7 +136,7 @@ internal partial class MainViewModel : ViewModelBase
 
         // Se crea aqui, en el hilo de UI, para que Progress<T> capture su contexto y los reportes
         // vuelvan solos a ese hilo.
-        var progress = new Progress<IReadOnlyDictionary<int, string>>(OnCycleReported);
+        var progress = new Progress<IReadOnlyDictionary<int, RoiReport>>(OnCycleReported);
 
         _ = RunCycleAsync(progress);
     }
@@ -161,7 +161,7 @@ internal partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>Envuelve el ciclo para sacarlo del hilo de UI y no perder sus excepciones.</summary>
-    private async Task RunCycleAsync(IProgress<IReadOnlyDictionary<int, string>> progress)
+    private async Task RunCycleAsync(IProgress<IReadOnlyDictionary<int, RoiReport>> progress)
     {
         try
         {
@@ -179,11 +179,18 @@ internal partial class MainViewModel : ViewModelBase
         }
     }
 
-    private void OnCycleReported(IReadOnlyDictionary<int, string> textByRoi)
+    private void OnCycleReported(IReadOnlyDictionary<int, RoiReport> reportByRoi)
     {
         CycleReports++;
         DetectedText = string.Join(
             Environment.NewLine,
-            textByRoi.OrderBy(entry => entry.Key).Select(entry => $"[ROI {entry.Key}] {entry.Value}"));
+            reportByRoi.OrderBy(entry => entry.Key).Select(entry => FormatRoi(entry.Key, entry.Value)));
     }
+
+    // Un fallo se muestra aparte del texto: sin esto, un OCR roto se veria igual que una pantalla
+    // estatica o que el congelamiento del portal (el contador de vueltas sigue subiendo en los tres).
+    private static string FormatRoi(int roiId, RoiReport report)
+        => report.Error is null
+            ? $"[ROI {roiId}] {report.Text}"
+            : $"[ROI {roiId}] {report.Text}{Environment.NewLine}[ROI {roiId}] Error (se muestra el último texto válido): {report.Error}";
 }

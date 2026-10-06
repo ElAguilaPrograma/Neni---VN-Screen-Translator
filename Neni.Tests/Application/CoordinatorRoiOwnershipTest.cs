@@ -1,4 +1,5 @@
 using Neni.Abstractions.Entities;
+using Neni.Application.Interfaces;
 
 namespace Neni.Tests.Application;
 
@@ -52,19 +53,19 @@ public class CoordinatorRoiOwnershipTest
 
     private static RegionOfInterest Roi(int id, double width) => new(id, 0, 0, width, 1);
 
-    private static bool Matches(IReadOnlyDictionary<int, string> texts, params (int RoiId, string Text)[] expected)
+    private static bool Matches(IReadOnlyDictionary<int, RoiReport> texts, params (int RoiId, string Text)[] expected)
         => texts.Count == expected.Length
-           && expected.All(e => texts.TryGetValue(e.RoiId, out var text) && text == e.Text);
+           && expected.All(e => texts.TryGetValue(e.RoiId, out var report) && report.Text == e.Text);
 
     // IProgress sincrono (sin SynchronizationContext) que permite esperar a que llegue un reporte
     // que cumpla una condicion.
-    private sealed class ReportWaiter : IProgress<IReadOnlyDictionary<int, string>>
+    private sealed class ReportWaiter : IProgress<IReadOnlyDictionary<int, RoiReport>>
     {
         private readonly Lock _gate = new();
-        private Func<IReadOnlyDictionary<int, string>, bool>? _predicate;
+        private Func<IReadOnlyDictionary<int, RoiReport>, bool>? _predicate;
         private TaskCompletionSource? _match;
 
-        public void Report(IReadOnlyDictionary<int, string> value)
+        public void Report(IReadOnlyDictionary<int, RoiReport> value)
         {
             lock (_gate)
             {
@@ -73,7 +74,7 @@ public class CoordinatorRoiOwnershipTest
             }
         }
 
-        public async Task WaitForAsync(Func<IReadOnlyDictionary<int, string>, bool> predicate, TimeSpan timeout)
+        public async Task WaitForAsync(Func<IReadOnlyDictionary<int, RoiReport>, bool> predicate, TimeSpan timeout)
         {
             var match = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             lock (_gate)

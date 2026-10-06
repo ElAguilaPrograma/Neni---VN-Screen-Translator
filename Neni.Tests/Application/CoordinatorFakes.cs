@@ -44,10 +44,18 @@ internal static class CoordinatorFakes
     internal sealed class FakeOcr : IOcr
     {
         public int Detections { get; private set; }
+        public bool FailNextDetect { get; set; }
 
         public Task<OcrResult> DetectAsync(Frame frame, CancellationToken cancellationToken = default)
         {
             Detections++;
+
+            if (FailNextDetect)
+            {
+                FailNextDetect = false;
+                throw new InvalidOperationException("Fallo simulado del OCR.");
+            }
+
             TextPoint[] box = [new(0, 0), new(1, 0), new(1, 1), new(0, 1)];
             return Task.FromResult(new OcrResult([new OcrTextBlock($"{frame.Width}", box, 1f)]));
         }
@@ -84,9 +92,12 @@ internal static class CoordinatorFakes
     // Devuelve siempre la misma instancia, como LinuxFrameCapture con una pantalla estatica.
     internal sealed class FakeFrameCapture : IFrameCapture
     {
-        private readonly Frame _frame = new(new byte[4], 1, 1, 4, PixelFormat.Bgra8888);
+        private Frame _frame = new(new byte[4], 1, 1, 4, PixelFormat.Bgra8888);
 
         public bool FailNextGrab { get; set; }
+
+        // Simula que llego un frame nuevo (otra instancia), para saltar el corte por frame completo.
+        public void NextFrame() => _frame = _frame with { PixelData = new byte[4] };
 
         public Task AttachToTargetAsync(CaptureTarget target, CancellationToken cancellationToken = default) => Task.CompletedTask;
 

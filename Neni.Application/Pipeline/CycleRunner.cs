@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Neni.Abstractions.Entities;
 using Neni.Abstractions.Interfaces;
+using Neni.Application.Interfaces;
 
 namespace Neni.Application.Pipeline;
 
@@ -16,6 +17,8 @@ internal sealed class CycleRunner
     private readonly OverlayTracker _overlayTracker;
     private readonly Stopwatch _stopwatch = new();
     private readonly Dictionary<int, string> _texts = new();
+    // Motivo del ultimo fallo por ROI; se borra en cuanto esa ROI vuelve a procesarse bien.
+    private readonly Dictionary<int, string> _errors = new();
     private bool _running;
     private CancellationTokenSource? _cts;
     private Task? _loopTask;
@@ -43,7 +46,7 @@ internal sealed class CycleRunner
     /// </summary>
     public async Task RunAsync(
         Func<IReadOnlyList<RegionOfInterest>> roiSource,
-        IProgress<IReadOnlyDictionary<int, string>>? progress)
+        IProgress<IReadOnlyDictionary<int, RoiReport>>? progress)
     {
         var interval = _settings.TimerCycleInterval;
 
@@ -98,9 +101,9 @@ internal sealed class CycleRunner
     }
 
     /// <summary>
-    /// Una vuelta sobre las ROIs dadas. Devuelve el texto actual de cada ROI (vacio si no hay ROIs).
+    /// Una vuelta sobre las ROIs dadas. Devuelve el estado actual de cada ROI (vacio si no hay ROIs).
     /// </summary>
-    internal async Task<IReadOnlyDictionary<int, string>> ProcessTurnAsync(
+    internal async Task<IReadOnlyDictionary<int, RoiReport>> ProcessTurnAsync(
         IReadOnlyList<RegionOfInterest> activeRois,
         CancellationToken cancellationToken)
     {
@@ -128,12 +131,24 @@ internal sealed class CycleRunner
         {
             var result = await _roiProcessor.ProcessAsync(roi, windowFrame, cancellationToken);
 
-            // Unchanged o Failed: se conserva el texto y el overlay que ya tenia esta ROI.
-            if (result.Outcome != RoiOutcome.Updated)
-                continue;
+            switch (result.Outcome)
+            {
+                case RoiOutcome.Failed:
+                    // Se conserva el texto y el overlay anteriores, pero el fallo se reporta: si no, una
+                    // ROI rota se veria igual que una pantalla estatica.
+                    _errors[roi.RoiId] = result.Error ?? "Error desconocido.";
+                    break;
 
-            await _overlayTracker.ApplyAsync(roi, result.Blocks);
-            _texts[roi.RoiId] = string.Join(Environment.NewLine, result.Blocks.Select(b => b.TranslatedText));
+                case RoiOutcome.Unchanged:
+                    _errors.Remove(roi.RoiId);
+                    break;
+
+                case RoiOutcome.Updated:
+                    await _overlayTracker.ApplyAsync(roi, result.Blocks);
+                    _texts[roi.RoiId] = string.Join(Environment.NewLine, result.Blocks.Select(b => b.TranslatedText));
+                    _errors.Remove(roi.RoiId);
+                    break;
+            }
         }
 
         return Snapshot();
@@ -141,7 +156,7 @@ internal sealed class CycleRunner
 
     private async Task LoopAsync(
         Func<IReadOnlyList<RegionOfInterest>> roiSource,
-        IProgress<IReadOnlyDictionary<int, string>>? progress,
+        IProgress<IReadOnlyDictionary<int, RoiReport>>? progress,
         int interval,
         CancellationToken cancellationToken)
     {
@@ -183,6 +198,7 @@ internal sealed class CycleRunner
             _overlayTracker.Forget(staleRoi.RoiId);
             _roiProcessor.Forget(staleRoi.RoiId);
             _texts.Remove(staleRoi.RoiId);
+            _errors.Remove(staleRoi.RoiId);
         }
     }
 
@@ -199,9 +215,13 @@ internal sealed class CycleRunner
         _lastWindowFrame = null;
         _lastProcessedRois = null;
         _texts.Clear();
+        _errors.Clear();
         _running = false;
     }
 
-    /// <summary>Copia el texto actual de cada ROI, para no exponer el diccionario mutable interno.</summary>
-    private IReadOnlyDictionary<int, string> Snapshot() => new Dictionary<int, string>(_texts);
+    /// <summary>Copia el estado actual de cada ROI, para no exponer los diccionarios mutables internos.</summary>
+    private IReadOnlyDictionary<int, RoiReport> Snapshot()
+        => _texts.Keys.Union(_errors.Keys).ToDictionary(
+            roiId => roiId,
+            roiId => new RoiReport(_texts.GetValueOrDefault(roiId, ""), _errors.GetValueOrDefault(roiId)));
 }

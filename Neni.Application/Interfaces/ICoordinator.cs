@@ -27,10 +27,10 @@ public interface ICoordinator : IAsyncDisposable
 
 	/// <summary>
 	/// Arranca la pipeline sobre las ROIs actuales y la mantiene corriendo hasta StopCycle. No retorna
-	/// mientras el ciclo siga vivo. En cada vuelta reporta por progress el texto actual de cada ROI,
-	/// indexado por RoiId.
+	/// mientras el ciclo siga vivo. En cada vuelta reporta por progress el texto actual de cada ROI y
+	/// su error si el ultimo intento fallo, indexado por RoiId.
 	/// </summary>
-	Task StartCycle(IProgress<IReadOnlyDictionary<int, string>>? progress = null);
+	Task StartCycle(IProgress<IReadOnlyDictionary<int, RoiReport>>? progress = null);
 
 	/// <summary>Detiene la pipeline, espera a que el ciclo termine y limpia el estado de la sesion.</summary>
 	Task StopCycle();

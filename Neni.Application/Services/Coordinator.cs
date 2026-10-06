@@ -112,7 +112,7 @@ internal sealed class Coordinator : ICoordinator
     /// Arranca la pipeline y la mantiene corriendo hasta StopCycle. No retorna mientras el ciclo
     /// siga vivo. En cada vuelta reporta por progress el texto actual de cada ROI, indexado por RoiId.
     /// </summary>
-    public Task StartCycle(IProgress<IReadOnlyDictionary<int, string>>? progress = null)
+    public Task StartCycle(IProgress<IReadOnlyDictionary<int, RoiReport>>? progress = null)
     {
         // Los motores solo quedan listos después de InitializeAsync(); fallar aqui da un mensaje
         // claro en vez de un error a mitad de la primera vuelta.
